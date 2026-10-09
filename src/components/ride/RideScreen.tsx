@@ -102,7 +102,7 @@ export default function RideScreen() {
   if (phase === "intro") return <SafetyIntro onStart={start} lang={lang} onLang={setLang} onHearGuide={hearGuide} onRoute={setOnTheWay} />;
   return (
     <RideHud
-      camera={camera.state} gps={gps} online={online} videoRef={camera.ref} upcoming={upcoming} distance={distance} last={last} notice={notice} paused={paused}
+      camera={camera.state} gps={gps} online={online} videoRef={camera.ref} upcoming={upcoming} distance={distance} last={last} events={events} notice={notice} paused={paused}
       torch={torchSupported ? torchOn : null} onToggleTorch={toggleTorch}
       voiceOn={speech.on} count={events.length} onTogglePause={() => setPaused((p) => !p)} onToggleVoice={() => speech.setOn(!speech.on)} onEnd={end}
     />
