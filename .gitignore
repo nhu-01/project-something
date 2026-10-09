@@ -31,3 +31,9 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+.next/
+.vercel
+.claude/
+.data/
+*.tsbuildinfo
+next-env.d.ts

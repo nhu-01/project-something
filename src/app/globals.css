@@ -1,0 +1,114 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+@import "leaflet.markercluster/dist/MarkerCluster.css";
+
+/* Design tokens (DESIGN.md). Never hard-code colors in components. */
+:root {
+  --paper: #fafaf7;
+  --ink: #20211e;
+  --muted: #696b63;
+  --line: #e4e3dc;
+  --sage: #d6dfcf;
+  --moss: #42644c;
+  --card: #ffffff;
+  /* Subway line colors, used sparingly as small "bullets" (DESIGN.md). */
+  --line-red: #ee352e;
+  --line-green: #00933c;
+  --line-purple: #b933ad;
+  --line-blue: #0039a6;
+  --line-orange: #ff6319;
+  --line-lime: #6cbe45;
+  --line-brown: #996633;
+  --line-gray: #a7a9ac;
+  --line-yellow: #fccc0a;
+  --line-slate: #808183;
+  --line-teal: #00add0;
+  /* Severity 1 to 5, and repaired. Always shown with the number or word, never color alone. */
+  --sev-1: var(--line-lime);
+  --sev-2: var(--line-yellow);
+  --sev-3: var(--line-orange);
+  --sev-4: var(--line-red);
+  --sev-5: var(--line-purple);
+  --repaired: var(--line-blue);
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-sage: var(--sage);
+  --color-moss: var(--moss);
+  --color-repaired: var(--repaired);
+  --color-line-red: var(--line-red);
+  --color-card: var(--card);
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --text-display: clamp(40px, 7vw, 84px);
+}
+
+html { background: var(--paper); scroll-behavior: smooth; }
+body { background: var(--paper); color: var(--ink); font-family: var(--font-sans); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--sage); }
+:focus-visible { outline: 2px solid var(--moss); outline-offset: 3px; border-radius: 9999px; }
+
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+@layer components {
+  .display { font-size: var(--text-display); font-weight: 500; letter-spacing: -0.03em; line-height: 1.02; }
+  .h2 { font-size: clamp(28px, 4vw, 44px); font-weight: 500; letter-spacing: -0.025em; line-height: 1.1; }
+  .eyebrow { font-size: 13px; letter-spacing: 0.02em; color: var(--muted); }
+  .wrap { margin-inline: auto; max-width: 1180px; padding-inline: 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 24px; }
+  .pill { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; border-radius: 9999px; padding: 0 22px; font-size: 15px; font-weight: 500; transition: transform 180ms var(--ease), background-color 180ms var(--ease), opacity 180ms; }
+  .pill:hover { transform: translateY(-2px); }
+  .pill-ink { background: var(--ink); color: var(--paper); }
+  .pill-ink:hover { opacity: 0.88; }
+  .pill-line { border: 1px solid var(--ink); color: var(--ink); background: transparent; }
+  .pill-line:hover { background: var(--ink); color: var(--paper); }
+  .chip { display: inline-flex; min-height: 36px; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 9999px; padding: 0 14px; font-size: 14px; background: var(--card); transition: background-color 160ms, border-color 160ms; }
+  .chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+  /* A subway-style bullet: a small colored circle with a number or letter. */
+  .bullet { display: inline-grid; flex: none; place-items: center; width: 26px; height: 26px; border-radius: 9999px; font-size: 14px; font-weight: 700; line-height: 1; color: #fff; background: var(--ink); }
+  .bullet-lg { width: 36px; height: 36px; font-size: 18px; }
+  .bullet-dark { color: var(--ink); }
+}
+@media (min-width: 640px) { .wrap { padding-inline: 40px; } }
+
+/* The wordmark's dot rides through the subway line colors. Static red under reduced motion. */
+.logo-dot { background: var(--line-red); animation: line-cycle 33s linear infinite; }
+@keyframes line-cycle {
+  0%, 7% { background: var(--line-red); } 9%, 16% { background: var(--line-orange); } 18%, 25% { background: var(--line-yellow); }
+  27%, 34% { background: var(--line-lime); } 36%, 43% { background: var(--line-green); } 45%, 52% { background: var(--line-teal); }
+  54%, 61% { background: var(--line-blue); } 63%, 70% { background: var(--line-purple); } 72%, 79% { background: var(--line-brown); }
+  81%, 88% { background: var(--line-slate); } 90%, 97% { background: var(--line-gray); } 100% { background: var(--line-red); }
+}
+@media (prefers-reduced-motion: reduce) { .logo-dot { animation: none; } }
+
+/* ---------- Motion ---------- */
+.ticker { overflow: hidden; mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent); }
+.ticker-track { animation: ticker 48s linear infinite; }
+.ticker:hover .ticker-track, .ticker:focus-within .ticker-track { animation-play-state: paused; }
+@keyframes ticker { to { transform: translateX(-50%); } }
+.pill svg { transition: transform 220ms var(--ease); }
+.pill:hover svg { transform: translate(2px, -2px); }
+@media (prefers-reduced-motion: reduce) {
+  .ticker { overflow-x: auto; mask-image: none; }
+  .ticker-track { animation: none; }
+  .pill svg { transition: none; }
+  .pill:hover svg { transform: none; }
+}
+
+/* ---------- Map ---------- */
+.map-shell .leaflet-container { background: var(--paper); font-family: var(--font-sans); height: 100%; width: 100%; }
+.map-shell .leaflet-tile-pane { filter: grayscale(1) contrast(0.85) brightness(1.08) sepia(0.06); }
+.map-shell .leaflet-control-zoom { border: 1px solid var(--line); border-radius: 9999px; overflow: hidden; background: var(--card); }
+.map-shell .leaflet-control-zoom a { width: 40px; height: 40px; line-height: 38px; color: var(--ink); background: var(--card); border: 0; }
+.map-shell .leaflet-control-attribution { font-size: 10px; background: color-mix(in srgb, var(--paper) 80%, transparent); }
+.pin-wrap, .cluster-wrap { background: none; border: 0; }
+.pin { position: relative; display: grid; width: 44px; height: 44px; place-items: center; border: 0; background: none; cursor: pointer; }
+.pin-dot { display: grid; place-items: center; border-radius: 9999px; background: var(--pin-color); color: var(--pin-text, #fff); font-size: 13px; font-weight: 700; line-height: 1; border: 2px solid var(--paper); box-shadow: 0 4px 10px rgb(32 33 30 / 0.22); width: 28px; height: 28px; transition: transform 180ms var(--ease); }
+.pin:hover .pin-dot { transform: scale(1.18); }
+.pin--selected .pin-dot { box-shadow: 0 0 0 2px var(--ink), 0 6px 14px rgb(32 33 30 / 0.3); transform: scale(1.2); }
+.pin--repaired .pin-dot { background: var(--paper); color: var(--repaired); border-color: var(--repaired); }
+.cluster { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 9999px; background: var(--ink); color: var(--paper); font-size: 14px; font-weight: 500; box-shadow: 0 0 0 5px color-mix(in srgb, var(--ink) 14%, transparent); }
