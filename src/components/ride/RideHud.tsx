@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Flashlight, Pause, Volume } from "@/components/ui/Icons";
 import Snapshot from "./Snapshot";
 import { SeverityBullet } from "@/components/ui/Bullet";
-import { HAZARD_LABEL, SEV_WORD } from "@/lib/tokens";
+import { HAZARD_LABEL, SEV_DARK_TEXT, SEV_VAR, SEV_WORD } from "@/lib/tokens";
 import type { GpsState, RideEvent, Upcoming } from "./types";
 
 const RESULT_COPY: Record<RideEvent["kind"], string> = {
@@ -25,6 +25,7 @@ type Props = {
   upcoming: Upcoming | null;
   distance: number;
   last: RideEvent | null;
+  events: RideEvent[];
   notice: string | null;
   paused: boolean;
   voiceOn: boolean;
@@ -36,7 +37,7 @@ type Props = {
   onEnd: () => void;
 };
 
-export default function RideHud({ camera, gps, online, videoRef, upcoming, distance, last, notice, paused, voiceOn, torch, onToggleTorch, count, onTogglePause, onToggleVoice, onEnd }: Props) {
+export default function RideHud({ camera, gps, online, videoRef, upcoming, distance, last, events, notice, paused, voiceOn, torch, onToggleTorch, count, onTogglePause, onToggleVoice, onEnd }: Props) {
   const reduce = useReducedMotion();
   const elapsed = useElapsed(!paused);
   const mm = String(Math.floor(elapsed / 60)).padStart(2, "0"), ss = String(elapsed % 60).padStart(2, "0");
@@ -54,6 +55,20 @@ export default function RideHud({ camera, gps, online, videoRef, upcoming, dista
       {/* quiet viewfinder corners, so it reads as a camera that is watching */}
       <div className="pointer-events-none absolute inset-[9%] rounded-[28px] border border-paper/25" aria-hidden />
       {last?.shot && <Snapshot key={last.id} src={last.shot} aspect={last.shotAspect ?? 0.5625} />}
+
+      {/* every photo taken this ride stays here, newest on top (the full list is in the recap) */}
+      <ul className="pointer-events-none absolute right-3 flex flex-col gap-2" style={{ top: "calc(env(safe-area-inset-top) + 84px)" }} aria-label="photos taken this ride">
+        <AnimatePresence initial={false}>
+          {[...events].reverse().filter((e) => e.shot).slice(0, 4).map((e) => (
+            <motion.li key={e.id} layout initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.6 }}
+              transition={{ duration: 0.45, delay: reduce ? 0 : 1.45, ease: [0.16, 1, 0.3, 1], layout: { duration: 0.45, delay: reduce ? 0 : 1.45 } }}
+              className="relative w-[58px] overflow-hidden rounded-[14px] border-2 border-paper shadow-[0_6px_18px_rgb(0_0_0/0.4)]" style={{ aspectRatio: e.shotAspect ?? 0.5625 }}>
+              <img src={e.shot} alt={`${HAZARD_LABEL[e.hazard]} on ${e.street}`} className="h-full w-full object-cover" />
+              {e.severity && <span className="absolute bottom-1 left-1 grid h-5 w-5 place-items-center rounded-full text-[11px] font-bold" style={{ background: SEV_VAR[e.severity], color: SEV_DARK_TEXT[e.severity] ? "var(--ink)" : "#fff" }} aria-hidden>{e.severity}</span>}
+            </motion.li>
+          ))}
+        </AnimatePresence>
+      </ul>
 
       {/* top bar */}
       <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 p-4" style={{ paddingTop: "calc(env(safe-area-inset-top) + 16px)" }}>
