@@ -31,7 +31,8 @@ export default function Recap({ events, seconds, meters, onAgain }: { events: Ri
             <ul className="card mt-6 divide-y divide-line">
               {events.map((e) => (
                 <li key={e.id} className="flex items-center justify-between gap-4 p-4">
-                  <div><p className="font-medium">{HAZARD_LABEL[e.hazard]} · {e.street}</p><p className="text-sm text-muted">{e.lane}{e.severity ? ` · ${SEV_WORD[e.severity]}` : ""}</p></div>
+                  {e.shot && <img src={e.shot} alt="" className="h-14 w-14 shrink-0 rounded-2xl object-cover" />}
+                  <div className="min-w-0 flex-1"><p className="font-medium">{HAZARD_LABEL[e.hazard]} · {e.street}</p><p className="text-sm text-muted">{e.lane}{e.severity ? ` · ${SEV_WORD[e.severity]}` : ""}</p></div>
                   <span className="rounded-full border border-line px-3 py-1 text-sm">{LABEL[e.kind]}</span>
                 </li>
               ))}

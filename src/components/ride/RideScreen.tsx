@@ -84,6 +84,7 @@ export default function RideScreen() {
   const start = () => {
     speech.unlock();
     dark.current = { frames: 0, manual: false, warned: false };
+    events.forEach((e) => { if (e.shot) URL.revokeObjectURL(e.shot); }); // free the last ride's snapshots
     setEvents([]); setLast(null); setNotice(null); setPaused(false); setPhase("starting");
     // spoken right away, inside the tap: confirms audio works and tells the rider what happens next
     speech.say(cuePhrase(lang, "start"), lang);

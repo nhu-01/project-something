@@ -2,6 +2,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
 import { Flashlight, Pause, Volume } from "@/components/ui/Icons";
+import Snapshot from "./Snapshot";
 import { SeverityBullet } from "@/components/ui/Bullet";
 import { HAZARD_LABEL, SEV_WORD } from "@/lib/tokens";
 import type { GpsState, RideEvent, Upcoming } from "./types";
@@ -50,6 +51,9 @@ export default function RideHud({ camera, gps, online, videoRef, upcoming, dista
         </div>
       )}
       <div className="absolute inset-0 bg-ink/25" aria-hidden />
+      {/* quiet viewfinder corners, so it reads as a camera that is watching */}
+      <div className="pointer-events-none absolute inset-[9%] rounded-[28px] border border-paper/25" aria-hidden />
+      {last?.shot && <Snapshot key={last.id} src={last.shot} aspect={last.shotAspect ?? 0.5625} />}
 
       {/* top bar */}
       <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 p-4" style={{ paddingTop: "calc(env(safe-area-inset-top) + 16px)" }}>
@@ -59,7 +63,7 @@ export default function RideHud({ camera, gps, online, videoRef, upcoming, dista
           <span className="text-muted" aria-label={`elapsed ${mm} minutes ${ss} seconds`}>{mm}:{ss}</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="rounded-full bg-paper/90 px-4 py-2 text-sm text-ink backdrop-blur">{count} logged</div>
+          <motion.div key={count} initial={count > 0 && !reduce ? { scale: 1.25 } : false} animate={{ scale: 1 }} transition={{ delay: 1.55, duration: 0.5, ease: [0.16, 1, 0.3, 1] }} className="rounded-full bg-paper/90 px-4 py-2 text-sm text-ink backdrop-blur">{count} logged</motion.div>
           {torch !== null && <button onClick={onToggleTorch} aria-pressed={torch} aria-label={torch ? "turn flashlight off" : "turn flashlight on"} className={`grid h-11 w-11 place-items-center rounded-full backdrop-blur ${torch ? "bg-paper/90 text-ink" : "bg-paper/30 text-paper"}`}><Flashlight /></button>}
           <button onClick={onToggleVoice} aria-pressed={voiceOn} aria-label={voiceOn ? "mute voice" : "unmute voice"} className={`grid h-11 w-11 place-items-center rounded-full backdrop-blur ${voiceOn ? "bg-paper/90 text-ink" : "bg-paper/30 text-paper"}`}><Volume /></button>
         </div>
