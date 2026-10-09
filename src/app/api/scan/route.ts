@@ -7,7 +7,7 @@ export async function POST(req: Request) {
   const r = await readFrameRequest(req);
   if ("error" in r) return r.error;
   try {
-    return Response.json({ event: await scanFrame(r.ride, r.frame, r.pos) });
+    return Response.json(await scanFrame(r.ride, r.frame, r.pos));
   } catch (e) {
     console.error("scan failed", e);
     return Response.json({ event: null, error: "scan failed" }, { status: 500 });

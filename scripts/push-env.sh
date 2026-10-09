@@ -10,6 +10,11 @@ for k in DATABASE_URL GEMINI_API_KEY GEMINI_MODEL; do
   [ -n "$v" ] || { echo "missing $k in .env.local"; exit 1; }
   put "$k" "$v"
 done
+# Optional settings: copied only when present in .env.local.
+for k in ELEVENLABS_API_KEY ELEVENLABS_VOICE_ID; do
+  v="$(get "$k")"
+  [ -n "$v" ] && put "$k" "$v"
+done
 # Only create the salt once: changing it would rename every rider and invalidate active rides.
 $VERCEL env ls production 2>/dev/null | grep -q HASH_SALT || put HASH_SALT "$(openssl rand -hex 16)"
 echo "done"

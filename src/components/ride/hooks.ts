@@ -32,14 +32,34 @@ export function useWakeLock(active: boolean) {
   }, [active]);
 }
 
+// A short silent clip: playing it inside the Start tap is what lets iOS play our audio later without a gesture.
+const SILENT = "data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA";
+
+function primed(existing: HTMLAudioElement | null) {
+  const a = existing ?? new Audio();
+  a.preload = "auto";
+  a.src = SILENT;
+  void a.play().catch(() => {});
+  return a;
+}
+
+// onFail(permanent): the endpoint answered with something that isn't audio (e.g. voice not configured).
+function playUrl(a: HTMLAudioElement, url: string, onFail: (permanent: boolean) => void) {
+  a.onerror = () => onFail(true);
+  a.src = url;
+  // AbortError just means a newer phrase replaced this one
+  void a.play().catch((e: unknown) => { if ((e as Error)?.name !== "AbortError" && (e as Error)?.name !== "NotSupportedError") onFail(false); });
+}
+
+// Voice for the ride. ElevenLabs (via /api/voice) when it is configured, the phone's built-in voice otherwise.
 export function useSpeech() {
   const [on, setOn] = useState(true);
   const onRef = useRef(on);
-  useEffect(() => { onRef.current = on; }, [on]);
-  // iOS only allows speech after a user gesture, so call unlock() from the Start tap.
-  const unlock = useCallback(() => { try { window.speechSynthesis?.speak(new SpeechSynthesisUtterance("")); } catch { /* unsupported */ } }, []);
-  const say = useCallback((text: string) => {
-    if (!onRef.current) return;
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const eleven = useRef(true); // flips off after the first failure, so we stop retrying mid-ride
+  useEffect(() => { onRef.current = on; if (!on) { audio.current?.pause(); try { window.speechSynthesis?.cancel(); } catch { /* unsupported */ } } }, [on]);
+
+  const builtIn = useCallback((text: string) => {
     try {
       window.speechSynthesis?.cancel();
       const u = new SpeechSynthesisUtterance(text);
@@ -47,5 +67,24 @@ export function useSpeech() {
       window.speechSynthesis?.speak(u);
     } catch { /* unsupported */ }
   }, []);
-  return { on, setOn, say, unlock };
+
+  // Call from the Start tap.
+  const unlock = useCallback(() => {
+    try { window.speechSynthesis?.speak(new SpeechSynthesisUtterance("")); } catch { /* unsupported */ }
+    audio.current = primed(audio.current);
+  }, []);
+
+  const say = useCallback((text: string) => {
+    if (!onRef.current) return;
+    const a = audio.current;
+    if (!a || !eleven.current) return builtIn(text);
+    playUrl(a, `/api/voice?text=${encodeURIComponent(text)}`, (permanent) => { if (permanent) eleven.current = false; builtIn(text); });
+  }, [builtIn]);
+
+  const stop = useCallback(() => {
+    audio.current?.pause();
+    try { window.speechSynthesis?.cancel(); } catch { /* unsupported */ }
+  }, []);
+
+  return { on, setOn, say, unlock, stop };
 }

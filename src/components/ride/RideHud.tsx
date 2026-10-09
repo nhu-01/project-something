@@ -23,6 +23,7 @@ type Props = {
   upcoming: Upcoming | null;
   distance: number;
   last: RideEvent | null;
+  notice: string | null;
   paused: boolean;
   voiceOn: boolean;
   count: number;
@@ -31,7 +32,7 @@ type Props = {
   onEnd: () => void;
 };
 
-export default function RideHud({ camera, gps, online, videoRef, upcoming, distance, last, paused, voiceOn, count, onTogglePause, onToggleVoice, onEnd }: Props) {
+export default function RideHud({ camera, gps, online, videoRef, upcoming, distance, last, notice, paused, voiceOn, count, onTogglePause, onToggleVoice, onEnd }: Props) {
   const reduce = useReducedMotion();
   const elapsed = useElapsed(!paused);
   const mm = String(Math.floor(elapsed / 60)).padStart(2, "0"), ss = String(elapsed % 60).padStart(2, "0");
@@ -75,6 +76,8 @@ export default function RideHud({ camera, gps, online, videoRef, upcoming, dista
               </div>
               <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-line"><div className="h-full rounded-full bg-ink transition-[width] duration-300 ease-linear" style={{ width: `${100 - (distance / upcoming.startFt) * 100}%` }} /></div>
             </motion.div>
+          ) : notice ? (
+            <motion.div key={notice} {...rise} role="status" className="max-w-md rounded-full bg-paper/95 px-5 py-3 text-center text-[15px] text-ink backdrop-blur">{notice}</motion.div>
           ) : last ? (
             <motion.div key={last.id} {...rise} role="status" className="rounded-full bg-paper/95 px-5 py-3 text-[15px] text-ink backdrop-blur">
               <span className="mr-2 inline-block h-2 w-2 rounded-full bg-moss align-middle" aria-hidden />{RESULT_COPY[last.kind]}

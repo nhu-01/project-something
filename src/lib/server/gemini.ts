@@ -10,6 +10,7 @@ export const Verdict = z.object({
   lane: z.enum(["right lane", "right lane, near curb", "center lane", "left lane", "bike lane", "crosswalk", "intersection", "unknown lane"]),
   road_type: z.enum(["street", "highway_or_ramp", "bridge_or_tunnel", "not_a_road"]),
   people_or_plates: z.boolean(),
+  screen_or_print: z.boolean(),
   confidence: z.enum(["low", "medium", "high"]),
   note: z.string(),
 });
@@ -22,12 +23,16 @@ severity (int 1-5, or null if no pothole), size (small | medium | large | null),
 lane (right lane | right lane, near curb | center lane | left lane | bike lane | crosswalk | intersection | unknown lane),
 road_type (street | highway_or_ramp | bridge_or_tunnel | not_a_road),
 people_or_plates (bool: identifiable faces or readable license plates in frame),
+screen_or_print (bool: the camera is pointed at a picture rather than a real road: a phone, laptop, TV or monitor screen,
+  a printed photo or poster. Clues: bezels or window chrome, pixel grid or moire, screen glare, a flat rectangle with the
+  road inside it, UI elements, paper edges),
 confidence (low | medium | high), note (one short lowercase sentence about what you see).
 
 Severity: 1 shallow dip or surface crack. 2 small shallow hole under ~15 cm. 3 clear hole 15-30 cm, a real jolt.
 4 deep or wide hole 30-60 cm, likely wheel damage, riders swerve. 5 very large or deep, serious hazard to bikes and scooters.
 Be conservative: shadows, manhole covers, drains, puddles, stains and painted markings are NOT potholes.
-If unsure, pothole_present=false with confidence "low". A photo of a screen showing a road counts as the road it shows.`;
+If unsure, pothole_present=false with confidence "low".
+Still judge pothole_present for what the picture shows, even when screen_or_print is true.`;
 
 export async function judgeFrame(frame: Buffer): Promise<Verdict> {
   const key = process.env.GEMINI_API_KEY;

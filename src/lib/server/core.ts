@@ -9,6 +9,12 @@ export const JOIN_RADIUS_M = 15; // frames within this distance of a known potho
 const NEW_HIT = Number(process.env.YOLO_NEW_HIT ?? 0.35); // detector confidence needed to consider a brand-new pothole
 const KNOWN_HIT = Number(process.env.YOLO_KNOWN_HIT ?? 0.2); // lower bar when we already expect one here
 
+// A picture of a pothole (screen or print) must not become a real pothole on the map. ALLOW_SCREEN_FRAMES=1 turns this
+// off for indoor testing only.
+const allowScreens = () => process.env.ALLOW_SCREEN_FRAMES === "1";
+const isPicture = (v: Verdict) => v.screen_or_print && !allowScreens();
+export type ScanResult = { event: RideEventOut | null; hint?: "screen" };
+
 export type Position = { lat: number; lng: number; heading: number | null; accuracy: number | null };
 export type RideEventOut = { kind: "new" | "confirmed" | "worse" | "better" | "repaired"; potholeId: string; street: string; lane: string; severity: number | null };
 type Ride = { id: string; rider: string };
@@ -47,22 +53,25 @@ async function resight(ride: Ride, p: Known, v: Verdict, pos: Position, frame: B
 }
 
 // Called for each camera frame during a ride.
-export async function scanFrame(ride: Ride, frame: Buffer, pos: Position): Promise<RideEventOut | null> {
+export async function scanFrame(ride: Ride, frame: Buffer, pos: Position): Promise<ScanResult> {
   await query("UPDATE rides SET frames = frames + 1 WHERE id=$1", [ride.id]);
-  if (!inNyc(pos.lat, pos.lng) || (pos.accuracy != null && pos.accuracy > 50)) return null;
+  if (!inNyc(pos.lat, pos.lng) || (pos.accuracy != null && pos.accuracy > 50)) return { event: null };
 
   const yolo = await potholeConfidence(frame);
   const near = (await nearbyOpen(pos.lat, pos.lng, JOIN_RADIUS_M)).sort((x, y) => meters(pos.lat, pos.lng, x.lat, x.lng) - meters(pos.lat, pos.lng, y.lat, y.lng))[0];
 
   if (near) {
-    if (yolo < KNOWN_HIT || (await alreadySeen(ride.id, near.id))) return null;
+    if (yolo < KNOWN_HIT || (await alreadySeen(ride.id, near.id))) return { event: null };
     const v = await judgeFrame(frame);
-    return v.pothole_present ? resight(ride, near, v, pos, frame, yolo) : null; // absence is settled by passCheck when the rider leaves
+    if (isPicture(v)) return { event: null, hint: "screen" };
+    // absence is settled by passCheck when the rider leaves
+    return { event: v.pothole_present ? await resight(ride, near, v, pos, frame, yolo) : null };
   }
 
-  if (yolo < NEW_HIT) return null;
+  if (yolo < NEW_HIT) return { event: null };
   const v = await judgeFrame(frame);
-  if (!v.pothole_present || v.road_type !== "street" || v.confidence === "low") return null;
+  if (isPicture(v)) return { event: null, hint: v.pothole_present ? "screen" : undefined };
+  if (!v.pothole_present || v.road_type !== "street" || v.confidence === "low") return { event: null };
 
   const place = await reverseGeocode(pos.lat, pos.lng);
   const sev = v.severity ?? 2;
@@ -73,7 +82,7 @@ export async function scanFrame(ride: Ride, frame: Buffer, pos: Position): Promi
   const photo = await photoFor(`${ride.id}-${row.id}.jpg`, frame, v);
   if (photo) await query("UPDATE potholes SET photo=$2 WHERE id=$1", [row.id, photo]);
   await record(ride, row.id, "first_seen", v, pos, photo, yolo, v.note);
-  return { kind: "new", potholeId: String(row.id), street: place.street, lane: v.lane, severity: sev };
+  return { event: { kind: "new", potholeId: String(row.id), street: place.street, lane: v.lane, severity: sev } };
 }
 
 // Called once when a rider has passed a known pothole without the camera confirming it.
@@ -84,6 +93,7 @@ export async function passCheck(ride: Ride, potholeId: number, frame: Buffer, po
 
   const yolo = await potholeConfidence(frame);
   const v = await judgeFrame(frame);
+  if (isPicture(v)) return null; // a picture says nothing about the real road, so record nothing
   if (v.pothole_present) return resight(ride, p, v, pos, frame, yolo);
 
   // Not visible. A repair patch, or two different riders in a row not finding it, counts as repaired.

@@ -51,17 +51,18 @@ type Opts = {
   videoRef: RefObject<HTMLVideoElement | null>;
   onAhead: (u: Upcoming) => void;
   onResult: (e: RideEvent) => void;
+  onHint: (hint: "screen") => void;
 };
 
 // Runs a ride: tracks GPS, warns about saved potholes ahead, and sends camera frames to the server,
 // which detects new potholes and compares known ones with what earlier riders saw.
-export function useRideEngine({ active, paused, videoRef, onAhead, onResult }: Opts) {
+export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onHint }: Opts) {
   const [upcoming, setUpcoming] = useState<Upcoming | null>(null);
   const [distance, setDistance] = useState(0);
   const [gps, setGps] = useState<GpsState>("waiting");
   const [online, setOnline] = useState(true);
-  const live = useRef({ paused, onAhead, onResult });
-  useEffect(() => { live.current = { paused, onAhead, onResult }; }, [paused, onAhead, onResult]);
+  const live = useRef({ paused, onAhead, onResult, onHint });
+  useEffect(() => { live.current = { paused, onAhead, onResult, onHint }; }, [paused, onAhead, onResult, onHint]);
 
   useEffect(() => {
     if (!active) return;
@@ -72,6 +73,7 @@ export function useRideEngine({ active, paused, videoRef, onAhead, onResult }: O
     let lastFetch: { at: number; lat: number; lng: number } | null = null;
     let lastFrame: Blob | null = null;
     let current: { id: string; minD: number } | null = null;
+    let lastHint = 0;
     const known = new Map<string, Known>();
     const warned = new Set<string>();
     const resolved = new Set<string>(); // potholes that already got a result on this ride
@@ -96,7 +98,11 @@ export function useRideEngine({ active, paused, videoRef, onAhead, onResult }: O
       try {
         const res = await fetch(path, { method: "POST", body: form });
         setOnline(res.ok);
-        return res.ok ? ((await res.json()) as { event: ServerEvent | null }).event : null;
+        if (!res.ok) return null;
+        const body = (await res.json()) as { event: ServerEvent | null; hint?: "screen" };
+        // don't nag: at most one hint every 20 seconds
+        if (body.hint && !stopped && Date.now() - lastHint > 20000) { lastHint = Date.now(); live.current.onHint(body.hint); }
+        return body.event;
       } catch { setOnline(false); return null; }
     };
 
