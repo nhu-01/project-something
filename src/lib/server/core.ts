@@ -5,7 +5,12 @@ import { bbox, directionWord, meters, reverseGeocode, validPoint } from "./geo";
 import { savePhoto } from "./storage";
 import { damageConfidence, stripPadding } from "./yolo";
 
-export const JOIN_RADIUS_M = 15; // frames within this distance of a known pothole count as a pass over it
+// Phone GPS is only good to 5-20 m (worse between buildings), so anything this close to a known hazard is treated as
+// the same hazard. 15 m turned out to be too tight: a little drift made every visit log a "new" one.
+export const JOIN_RADIUS_M = 25;
+const joinRadius = (pos: Position) => Math.min(45, Math.max(JOIN_RADIUS_M, (pos.accuracy ?? 10) + 15));
+// Hairline cracks and shallow dips (severity 1) are everywhere; logging each one buries the real hazards.
+const MIN_NEW_SEVERITY = Number(process.env.MIN_NEW_SEVERITY ?? 2);
 // The detector is only a cheap first pass, so its bar is deliberately low: Gemini makes the real call.
 const NEW_HIT = Number(process.env.YOLO_NEW_HIT ?? 0.2); // confidence needed to consider a brand-new hazard
 const KNOWN_HIT = Number(process.env.YOLO_KNOWN_HIT ?? 0.12); // lower bar when we already expect one here
@@ -47,7 +52,7 @@ async function detect(ride: Ride, frame: Buffer) {
 export async function nearbyOpen(lat: number, lng: number, radiusM: number): Promise<Known[]> {
   const [a, b, c, d] = bbox(lat, lng, radiusM);
   const rows = await query<Known>(
-    `SELECT ${KNOWN_COLS} FROM potholes WHERE status='open' AND lat BETWEEN $1 AND $2 AND lng BETWEEN $3 AND $4`,
+    `SELECT ${KNOWN_COLS} FROM potholes WHERE status='open' AND merged_into IS NULL AND lat BETWEEN $1 AND $2 AND lng BETWEEN $3 AND $4`,
     [a, b, c, d],
   );
   return rows.filter((p) => meters(lat, lng, p.lat, p.lng) <= radiusM);
@@ -70,6 +75,15 @@ const photoFor = async (name: string, frame: Buffer, v: Verdict) => (v.people_or
 const justLogged = async (rideId: string) =>
   (await query("SELECT 1 FROM sightings WHERE ride_id=$1 AND kind='first_seen' AND at > now() - interval '3 seconds' LIMIT 1", [rideId])).length > 0;
 
+// Two frames of the same hazard can be checked at the same moment and both decide it's new. After inserting, look for
+// an older hazard right here; if there is one, ours is the duplicate, so fold it away and return the older one.
+async function lostRace(newId: number, pos: Position): Promise<Known | null> {
+  const older = (await nearbyOpen(pos.lat, pos.lng, joinRadius(pos))).filter((p) => p.id < newId).sort((a, b) => a.id - b.id)[0];
+  if (!older) return null;
+  await query("UPDATE potholes SET merged_into=$2 WHERE id=$1", [newId, older.id]);
+  return older;
+}
+
 // A rider saw a known pothole again: compare with what we had and update it.
 async function resight(ride: Ride, p: Known, v: Verdict, pos: Position, frame: Buffer, yolo: number): Promise<RideEventOut> {
   const sev = v.severity ?? p.severity ?? 1;
@@ -85,7 +99,7 @@ export async function scanFrame(ride: Ride, frame: Buffer, pos: Position): Promi
   const yolo = await detect(ride, frame);
   if (!validPoint(pos.lat, pos.lng) || (pos.accuracy != null && pos.accuracy > 65)) return { event: null };
 
-  const near = (await nearbyOpen(pos.lat, pos.lng, JOIN_RADIUS_M)).sort((x, y) => meters(pos.lat, pos.lng, x.lat, x.lng) - meters(pos.lat, pos.lng, y.lat, y.lng))[0];
+  const near = (await nearbyOpen(pos.lat, pos.lng, joinRadius(pos))).sort((x, y) => meters(pos.lat, pos.lng, x.lat, x.lng) - meters(pos.lat, pos.lng, y.lat, y.lng))[0];
 
   if (near) {
     if (await alreadySeen(ride.id, near.id)) return { event: null };
@@ -99,7 +113,7 @@ export async function scanFrame(ride: Ride, frame: Buffer, pos: Position): Promi
   if (yolo < NEW_HIT && !(await dueForLook(ride.id))) return { event: null };
   const v = await judge(ride, frame);
   if (isPicture(v)) return { event: null, hint: v.pothole_present ? "screen" : undefined };
-  if (!v.pothole_present || !RIDEABLE.has(v.road_type) || v.confidence === "low") return { event: null };
+  if (!v.pothole_present || !RIDEABLE.has(v.road_type) || v.confidence === "low" || (v.severity ?? 2) < MIN_NEW_SEVERITY) return { event: null };
   // At speed, the same hazard shows up in back-to-back frames taken more than JOIN_RADIUS_M apart. Don't log it twice.
   if (await justLogged(ride.id)) return { event: null };
 
@@ -109,6 +123,7 @@ export async function scanFrame(ride: Ride, frame: Buffer, pos: Position): Promi
     "INSERT INTO potholes (lat, lng, street, borough, direction, lane, size, severity, kind) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id",
     [pos.lat, pos.lng, place.street, place.borough, directionWord(pos.heading), v.lane, v.size ?? "medium", sev, hazardOf(v)],
   );
+  if (await lostRace(row.id, pos)) return { event: null };
   const photo = await photoFor(`${ride.id}-${row.id}.jpg`, frame, v);
   if (photo) await query("UPDATE potholes SET photo=$2 WHERE id=$1", [row.id, photo]);
   await record(ride, row.id, "first_seen", v, pos, photo, yolo, v.note);
@@ -117,7 +132,7 @@ export async function scanFrame(ride: Ride, frame: Buffer, pos: Position): Promi
 
 // Called once when a rider has passed a known pothole without the camera confirming it.
 export async function passCheck(ride: Ride, potholeId: number, frame: Buffer, pos: Position): Promise<RideEventOut | null> {
-  const [p] = await query<Known>(`SELECT ${KNOWN_COLS} FROM potholes WHERE id=$1 AND status='open'`, [potholeId]);
+  const [p] = await query<Known>(`SELECT ${KNOWN_COLS} FROM potholes WHERE id=$1 AND status='open' AND merged_into IS NULL`, [potholeId]);
   if (!p || (await alreadySeen(ride.id, p.id))) return null;
   if (meters(pos.lat, pos.lng, p.lat, p.lng) > JOIN_RADIUS_M * 3) return null; // not actually near it
 
@@ -151,7 +166,7 @@ export async function reportPhoto(ride: Ride, photo: Buffer, pos: Position): Pro
   if (!v.pothole_present) return { ok: false, reason: "no_hazard" };
   if (!RIDEABLE.has(v.road_type)) return { ok: false, reason: "not_rideable" };
 
-  const near = (await nearbyOpen(pos.lat, pos.lng, JOIN_RADIUS_M)).sort((x, y) => meters(pos.lat, pos.lng, x.lat, x.lng) - meters(pos.lat, pos.lng, y.lat, y.lng))[0];
+  const near = (await nearbyOpen(pos.lat, pos.lng, joinRadius(pos))).sort((x, y) => meters(pos.lat, pos.lng, x.lat, x.lng) - meters(pos.lat, pos.lng, y.lat, y.lng))[0];
   if (near) return { ok: true, event: await resight(ride, near, v, pos, photo, 0), photoKept: !v.people_or_plates };
 
   const place = await reverseGeocode(pos.lat, pos.lng);
@@ -160,6 +175,8 @@ export async function reportPhoto(ride: Ride, photo: Buffer, pos: Position): Pro
     "INSERT INTO potholes (lat, lng, street, borough, direction, lane, size, severity, kind) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id",
     [pos.lat, pos.lng, place.street, place.borough, directionWord(null), v.lane, v.size ?? "medium", sev, hazardOf(v)],
   );
+  const winner = await lostRace(row.id, pos);
+  if (winner) return { ok: true, event: await resight(ride, winner, v, pos, photo, 0), photoKept: !v.people_or_plates };
   const url = await photoFor(`${ride.id}-${row.id}.jpg`, photo, v);
   if (url) await query("UPDATE potholes SET photo=$2 WHERE id=$1", [row.id, url]);
   await record(ride, row.id, "first_seen", v, pos, url, null, v.note);
