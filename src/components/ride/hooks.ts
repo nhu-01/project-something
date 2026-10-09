@@ -102,8 +102,10 @@ type Line = { text: string; lang: Lang };
 
 // Voice for the ride. ElevenLabs (via /api/voice) when it is configured, the phone's built-in voice otherwise.
 // Lines queue up and play in order; a priority line (a warning) cuts in front of everything.
-export function useSpeech() {
+export function useSpeech(voice: "f" | "m") {
   const [on, setOn] = useState(true);
+  const voiceRef = useRef(voice);
+  useEffect(() => { voiceRef.current = voice; }, [voice]);
   const onRef = useRef(on);
   const audio = useRef<HTMLAudioElement | null>(null);
   const eleven = useRef(true); // flips off after the first failure, so we stop retrying mid-ride
@@ -133,7 +135,7 @@ export function useSpeech() {
     };
     const a = audio.current;
     if (!a || !eleven.current) return builtIn();
-    playUrl(a, `/api/voice?lang=${line.lang}&text=${encodeURIComponent(line.text)}`, finish, (permanent) => { if (permanent) eleven.current = false; builtIn(); });
+    playUrl(a, `/api/voice?voice=${voiceRef.current}&lang=${line.lang}&text=${encodeURIComponent(line.text)}`, finish, (permanent) => { if (permanent) eleven.current = false; builtIn(); });
   }, []);
 
   useEffect(() => { next.current = pump; }, [pump]);

@@ -9,26 +9,31 @@ import type { Phase, RideEvent, Upcoming } from "./types";
 import { aheadPhrase, briefPhrase, cuePhrase, preferredLang, resultPhrase, screenPhrase, type Lang } from "@/lib/voice";
 
 const noSubscribe = () => () => {};
+type Voice = "f" | "m";
+const savedVoice = (): Voice => { try { return localStorage.getItem("spotholes-voice") === "m" ? "m" : "f"; } catch { return "f"; } };
+const save = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* storage blocked */ } };
 
-// intro → starting (permissions) → riding → recap.
+// The camera opens straight away. Setup is a pop-up over it; "start ride" swaps the pop-up for the ride display.
+// intro (camera + setup pop-up) → riding → recap.
 export default function RideScreen() {
   const [phase, setPhase] = useState<Phase>("intro");
   const [events, setEvents] = useState<RideEvent[]>([]);
   const [last, setLast] = useState<RideEvent | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  // The saved/phone language is only known in the browser; this reads it without a hydration mismatch.
-  const detected = useSyncExternalStore(noSubscribe, preferredLang, () => "en" as Lang);
-  const [chosen, setChosen] = useState<Lang | null>(null);
-  const lang = chosen ?? detected;
-  const setLang = (l: Lang) => { setChosen(l); try { localStorage.setItem("spotholes-lang", l); } catch { /* storage blocked */ } };
+  // Saved choices are only known in the browser; this reads them without a hydration mismatch.
+  const detectedLang = useSyncExternalStore(noSubscribe, preferredLang, () => "en" as Lang);
+  const detectedVoice = useSyncExternalStore(noSubscribe, savedVoice, () => "f" as Voice);
+  const [chosenLang, setChosenLang] = useState<Lang | null>(null);
+  const [chosenVoice, setChosenVoice] = useState<Voice | null>(null);
+  const lang = chosenLang ?? detectedLang, voice = chosenVoice ?? detectedVoice;
   const [paused, setPaused] = useState(false);
-  const [onTheWay, setOnTheWay] = useState<number | null>(null); // known hazards toward the chosen destination
+  const [route, setRoute] = useState<{ count: number; label: string } | null>(null); // known hazards toward the destination
   const startedAt = useRef(0);
   const [summary, setSummary] = useState({ seconds: 0, meters: 0 });
-  const speech = useSpeech();
+  const speech = useSpeech(voice);
   const riding = phase === "riding";
 
-  const camera = useCamera(phase === "starting" || riding);
+  const { ref: videoRef, state: cameraState, torchSupported, torchOn, setTorch } = useCamera(phase !== "recap");
   useWakeLock(riding);
 
   // Warnings cut in front of anything else that's being said.
@@ -45,10 +50,10 @@ export default function RideScreen() {
     setNotice("that looks like a picture, not the road. nothing was logged.");
     speech.say(screenPhrase(lang), lang);
   }, [speech, lang]);
+
   // Night riding: after a few dark frames in a row, switch the flashlight on (where the browser allows it).
   // Once the rider touches the flashlight button, we leave it alone for the rest of the ride.
   const dark = useRef({ frames: 0, manual: false, warned: false });
-  const { torchSupported, torchOn, setTorch } = camera;
   const onLuma = useCallback((luma: number) => {
     const d = dark.current;
     d.frames = luma < 0.16 ? d.frames + 1 : 0;
@@ -62,14 +67,7 @@ export default function RideScreen() {
     }
   }, [torchSupported, torchOn, setTorch]);
   const toggleTorch = () => { dark.current.manual = true; void setTorch(!torchOn); };
-  const { upcoming, distance, gps, online, meters } = useRideEngine({ active: riding, paused, videoRef: camera.ref, onAhead, onResult, onHint, onLuma });
-
-  // brief "starting" step so permission prompts happen after the tap
-  useEffect(() => {
-    if (phase !== "starting") return;
-    const t = setTimeout(() => { startedAt.current = Date.now(); setPhase("riding"); }, 900);
-    return () => clearTimeout(t);
-  }, [phase]);
+  const { upcoming, distance, gps, online, meters } = useRideEngine({ active: riding, paused, videoRef, onAhead, onResult, onHint, onLuma });
 
   // Say so the first time GPS locks on, so the rider knows it's working without looking.
   const gpsSaid = useRef(false);
@@ -85,10 +83,12 @@ export default function RideScreen() {
     speech.unlock();
     dark.current = { frames: 0, manual: false, warned: false };
     events.forEach((e) => { if (e.shot) URL.revokeObjectURL(e.shot); }); // free the last ride's snapshots
-    setEvents([]); setLast(null); setNotice(null); setPaused(false); setPhase("starting");
+    setEvents([]); setLast(null); setNotice(null); setPaused(false);
+    startedAt.current = Date.now();
+    setPhase("riding");
     // spoken right away, inside the tap: confirms audio works and tells the rider what happens next
     speech.say(cuePhrase(lang, "start"), lang);
-    if (onTheWay != null) speech.say(briefPhrase(lang, onTheWay), lang);
+    if (route) speech.say(briefPhrase(lang, route.count), lang);
   };
   const end = () => {
     speech.stop();
@@ -98,13 +98,33 @@ export default function RideScreen() {
   };
   const hearGuide = () => { speech.unlock(); speech.say(cuePhrase(lang, "guide"), lang, true); };
 
-  if (phase === "recap") return <Recap events={events} seconds={summary.seconds} meters={summary.meters} onAgain={() => setPhase("intro")} />;
-  if (phase === "intro") return <SafetyIntro onStart={start} lang={lang} onLang={setLang} onHearGuide={hearGuide} onRoute={setOnTheWay} />;
+  if (phase === "recap") return <Recap events={events} seconds={summary.seconds} meters={summary.meters} onAgain={() => { setRoute(null); setPhase("intro"); }} />;
+
+  const heading = route ? `to ${route.label.split(",")[0].toLowerCase()} · ${route.count} known ${route.count === 1 ? "hazard" : "hazards"}` : null;
   return (
-    <RideHud
-      camera={camera.state} gps={gps} online={online} videoRef={camera.ref} upcoming={upcoming} distance={distance} last={last} events={events} notice={notice} paused={paused}
-      torch={torchSupported ? torchOn : null} onToggleTorch={toggleTorch}
-      voiceOn={speech.on} count={events.length} onTogglePause={() => setPaused((p) => !p)} onToggleVoice={() => speech.setOn(!speech.on)} onEnd={end}
-    />
+    <div className="fixed inset-0 z-[3000] bg-ink text-paper">
+      {/* one camera for both setup and the ride, so it never restarts in between */}
+      <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" playsInline muted autoPlay aria-hidden />
+      {cameraState !== "on" && (
+        <div className="absolute inset-0 grid place-items-center bg-ink p-8 text-center text-sm text-paper/60">
+          {cameraState === "denied" ? "camera unavailable. you'll still get warnings, but new hazards can't be logged." : "starting camera…"}
+        </div>
+      )}
+      <div className={`absolute inset-0 transition-colors duration-500 ${riding ? "bg-ink/25" : "bg-ink/45"}`} aria-hidden />
+
+      {riding ? (
+        <RideHud
+          gps={gps} online={online} upcoming={upcoming} distance={distance} last={last} events={events} heading={heading} notice={notice} paused={paused}
+          torch={torchSupported ? torchOn : null} onToggleTorch={toggleTorch}
+          voiceOn={speech.on} count={events.length} onTogglePause={() => setPaused((p) => !p)} onToggleVoice={() => speech.setOn(!speech.on)} onEnd={end}
+        />
+      ) : (
+        <SafetyIntro
+          onStart={start} lang={lang} onLang={(l) => { setChosenLang(l); save("spotholes-lang", l); }}
+          voice={voice} onVoice={(v) => { setChosenVoice(v); save("spotholes-voice", v); }}
+          onHearGuide={hearGuide} onRoute={(count, label) => setRoute(count != null && label ? { count, label } : null)}
+        />
+      )}
+    </div>
   );
 }

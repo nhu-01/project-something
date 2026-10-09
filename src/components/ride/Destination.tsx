@@ -14,7 +14,7 @@ const label = (k: string) => HAZARD_LABEL[k as keyof typeof HAZARD_LABEL] ?? "po
 const here = () => new Promise<GeolocationPosition>((res, rej) => navigator.geolocation ? navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 10000 }) : rej(new Error("no gps")));
 
 // Optional: say where you're heading and get the known hazards on the way before you set off.
-export default function Destination({ onRoute }: { onRoute: (count: number | null) => void }) {
+export default function Destination({ onRoute, compact = false }: { onRoute: (count: number | null, label: string | null) => void; compact?: boolean }) {
   const [q, setQ] = useState("");
   const [options, setOptions] = useState<Place[]>([]);
   const [picked, setPicked] = useState<Place | null>(null);
@@ -40,22 +40,22 @@ export default function Destination({ onRoute }: { onRoute: (count: number | nul
     setPicked(p); setQ(p.label); setOptions([]); setState("loading"); setResult(null);
     try {
       const pos = await here().catch(() => null);
-      if (!pos) { setState("nogps"); onRoute(null); return; }
+      if (!pos) { setState("nogps"); onRoute(null, null); return; }
       const res = await fetch(`/api/route?from=${pos.coords.latitude},${pos.coords.longitude}&to=${p.lat},${p.lng}`);
       if (!res.ok) throw new Error("route failed");
       const r = (await res.json()) as Result;
-      setResult(r); setState("idle"); onRoute(r.hazards.length);
-    } catch { setState("error"); onRoute(null); }
+      setResult(r); setState("idle"); onRoute(r.hazards.length, p.label);
+    } catch { setState("error"); onRoute(null, null); }
   };
-  const clear = () => { seq.current++; setPicked(null); setQ(""); setOptions([]); setResult(null); setState("idle"); onRoute(null); };
+  const clear = () => { seq.current++; setPicked(null); setQ(""); setOptions([]); setResult(null); setState("idle"); onRoute(null, null); };
 
   return (
-    <div className="mt-8">
-      <label htmlFor="dest" className="text-sm text-muted">where are you heading? (optional)</label>
-      <div className="relative mt-3">
+    <div className={compact ? "text-ink" : "mt-8"}>
+      <label htmlFor="dest" className={compact ? "sr-only" : "text-sm text-muted"}>where are you heading? (optional)</label>
+      <div className={compact ? "relative" : "relative mt-3"}>
         <div className="flex h-12 items-center gap-3 rounded-full border border-line bg-card px-4">
           <Search />
-          <input id="dest" value={q} onChange={(e) => { setQ(e.target.value); if (picked) { setPicked(null); setResult(null); onRoute(null); } }} placeholder="an address or place in nyc" autoComplete="off" className="w-full bg-transparent text-[15px] outline-none placeholder:text-muted" />
+          <input id="dest" value={q} onChange={(e) => { setQ(e.target.value); if (picked) { setPicked(null); setResult(null); onRoute(null, null); } }} placeholder={compact ? "where are you heading? (optional)" : "an address or place in nyc"} autoComplete="off" className="w-full bg-transparent text-[15px] outline-none placeholder:text-muted" />
           {q && <button type="button" onClick={clear} aria-label="clear destination" className="grid h-8 w-8 place-items-center rounded-full text-muted"><Close /></button>}
         </div>
         {options.length > 0 && (
@@ -77,7 +77,7 @@ export default function Destination({ onRoute }: { onRoute: (count: number | nul
             <p className="text-sm text-muted">{miles(result.distanceM)} · {result.routed ? "along a bike route" : "roughly, along a straight line (no route found)"} · only streets riders have covered are known</p>
             {result.hazards.length > 0 && (
               <ul className="mt-3 divide-y divide-line">
-                {result.hazards.slice(0, 6).map((h) => (
+                {result.hazards.slice(0, compact ? 3 : 6).map((h) => (
                   <li key={h.id} className="flex items-center gap-3 py-2 text-[15px]">
                     <SeverityBullet value={Math.min(5, Math.max(1, Math.round(h.severity))) as Severity} />
                     <span className="min-w-0 flex-1 truncate">{label(h.kind)} · {h.street}<span className="text-muted"> · {h.lane}</span></span>
@@ -86,7 +86,7 @@ export default function Destination({ onRoute }: { onRoute: (count: number | nul
                 ))}
               </ul>
             )}
-            {result.hazards.length > 6 && <p className="mt-2 text-sm text-muted">and {result.hazards.length - 6} more.</p>}
+            {result.hazards.length > (compact ? 3 : 6) && <p className="mt-2 text-sm text-muted">and {result.hazards.length - (compact ? 3 : 6)} more.</p>}
           </div>
         )}
       </div>
