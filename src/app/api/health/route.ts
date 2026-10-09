@@ -9,7 +9,7 @@ export async function GET() {
   };
   try {
     const t = Date.now();
-    const [r] = await query<{ n: number }>("SELECT COUNT(*)::int AS n FROM potholes");
+    const [r] = await query<{ n: number }>("SELECT COUNT(*)::int AS n FROM potholes WHERE merged_into IS NULL");
     out.db = { ok: true, potholes: r.n, ms: Date.now() - t };
     out.recentRides = await query(
       `SELECT to_char(r.started_at, 'MM-DD HH24:MI') AS started,

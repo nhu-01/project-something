@@ -11,7 +11,7 @@ for k in DATABASE_URL GEMINI_API_KEY GEMINI_MODEL; do
   put "$k" "$v"
 done
 # Optional settings: copied only when present in .env.local.
-for k in ELEVENLABS_API_KEY ELEVENLABS_VOICE_ID; do
+for k in ELEVENLABS_API_KEY ELEVENLABS_VOICE_ID ADMIN_KEY; do
   v="$(get "$k")"
   [ -n "$v" ] && put "$k" "$v"
 done

@@ -40,7 +40,7 @@ export async function hazardsOnTheWay(from: LatLng, to: LatLng) {
   const [minLat, , minLng] = bbox(Math.min(...lats), Math.min(...lngs), corridorM);
   const [, maxLat, , maxLng] = bbox(Math.max(...lats), Math.max(...lngs), corridorM);
   const rows = await query<{ id: number; lat: number; lng: number; kind: string; street: string; lane: string; severity: number | null }>(
-    "SELECT id, lat, lng, kind, street, lane, severity FROM potholes WHERE status='open' AND lat BETWEEN $1 AND $2 AND lng BETWEEN $3 AND $4 LIMIT 20000",
+    "SELECT id, lat, lng, kind, street, lane, severity FROM potholes WHERE status='open' AND merged_into IS NULL AND lat BETWEEN $1 AND $2 AND lng BETWEEN $3 AND $4 LIMIT 20000",
     [minLat, maxLat, minLng, maxLng],
   );
 

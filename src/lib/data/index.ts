@@ -25,7 +25,7 @@ function shape(p: PRow, sightings: SRow[]): Pothole {
 }
 
 export async function getPotholes(): Promise<Pothole[]> {
-  const rows = await query<PRow>("SELECT * FROM potholes ORDER BY last_seen DESC LIMIT 2000");
+  const rows = await query<PRow>("SELECT * FROM potholes WHERE merged_into IS NULL ORDER BY last_seen DESC LIMIT 2000");
   if (!rows.length) return [];
   const sightings = await query<SRow>("SELECT id, pothole_id, at, rider, kind, severity, note FROM sightings ORDER BY at ASC");
   const by = new Map<number, SRow[]>();
@@ -35,9 +35,11 @@ export async function getPotholes(): Promise<Pothole[]> {
 
 export async function getPothole(id: string): Promise<Pothole | null> {
   if (!/^\d+$/.test(id)) return null;
-  const [p] = await query<PRow>("SELECT * FROM potholes WHERE id=$1", [id]);
+  let [p] = await query<PRow & { merged_into: number | null }>("SELECT * FROM potholes WHERE id=$1", [id]);
+  // a duplicate that was folded into another hazard: show the one it became part of
+  if (p?.merged_into) [p] = await query<PRow & { merged_into: number | null }>("SELECT * FROM potholes WHERE id=$1", [p.merged_into]);
   if (!p) return null;
-  return shape(p, await query<SRow>("SELECT id, pothole_id, at, rider, kind, severity, note FROM sightings WHERE pothole_id=$1 ORDER BY at ASC", [id]));
+  return shape(p, await query<SRow>("SELECT id, pothole_id, at, rider, kind, severity, note FROM sightings WHERE pothole_id=$1 ORDER BY at ASC", [p.id]));
 }
 
 // Hide the start and end of every ride, so tracks don't point at anyone's home: 12% of the ride at each end,
@@ -84,7 +86,7 @@ export async function getStats(): Promise<Stats> {
             COUNT(*) FILTER (WHERE status='repaired')::int AS repaired,
             COUNT(*) FILTER (WHERE first_seen > now() - interval '7 days')::int AS new_week,
             COUNT(*) FILTER (WHERE status='repaired' AND last_seen > now() - interval '7 days')::int AS repaired_week
-     FROM potholes`,
+     FROM potholes WHERE merged_into IS NULL`,
   );
   // Only real rides: started from the ride screen and with GPS breadcrumbs. Photo reports and empty sessions don't count.
   const [r] = await query<{ n: number }>(
@@ -105,7 +107,7 @@ export async function getStats(): Promise<Stats> {
   });
   const worst = await query<{ street: string; borough: string; open: number; avg: number }>(
     `SELECT street, MIN(borough) AS borough, COUNT(*)::int AS open, AVG(severity)::float AS avg
-     FROM potholes WHERE status='open' AND severity IS NOT NULL GROUP BY street ORDER BY AVG(severity) * COUNT(*) DESC LIMIT 5`,
+     FROM potholes WHERE status='open' AND merged_into IS NULL AND severity IS NOT NULL GROUP BY street ORDER BY AVG(severity) * COUNT(*) DESC LIMIT 5`,
   );
   return {
     tracked: t.tracked, open: t.open, repaired: t.repaired, ridesThisWeek: r.n, milesRidden: trackMiles(await getTracks(3650)), newThisWeek: t.new_week, repairedThisWeek: t.repaired_week, daily,

@@ -58,3 +58,8 @@ ALTER TABLE rides ADD COLUMN IF NOT EXISTS max_yolo REAL NOT NULL DEFAULT 0;
 ALTER TABLE rides ADD COLUMN IF NOT EXISTS gemini_calls INT NOT NULL DEFAULT 0;
 ALTER TABLE rides ADD COLUMN IF NOT EXISTS last_look TIMESTAMPTZ;
 ALTER TABLE rides ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'ride';
+
+-- Duplicate hazards are folded into one without deleting anything: the duplicate keeps its row and points at the
+-- survivor, and moved sightings remember where they came from.
+ALTER TABLE potholes ADD COLUMN IF NOT EXISTS merged_into INT;
+ALTER TABLE sightings ADD COLUMN IF NOT EXISTS orig_pothole_id INT;
