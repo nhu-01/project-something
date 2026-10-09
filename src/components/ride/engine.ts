@@ -41,10 +41,10 @@ export function deviceId() {
 }
 
 // Letterboxes the current video frame to 640x640 for the detector, and measures how bright the scene is (0..1).
-function grabFrame(video: HTMLVideoElement, canvas: HTMLCanvasElement, tiny: HTMLCanvasElement): Promise<{ blob: Blob | null; luma: number }> {
+function grabFrame(video: HTMLVideoElement, canvas: HTMLCanvasElement, tiny: HTMLCanvasElement): Promise<{ blob: Blob | null; luma: number; aspect: number }> {
   const vw = video.videoWidth, vh = video.videoHeight;
   const ctx = canvas.getContext("2d"), tctx = tiny.getContext("2d", { willReadFrequently: true });
-  if (!vw || !vh || !ctx || !tctx) return Promise.resolve({ blob: null, luma: 1 });
+  if (!vw || !vh || !ctx || !tctx) return Promise.resolve({ blob: null, luma: 1, aspect: 1 });
   canvas.width = 640; canvas.height = 640;
   const s = Math.min(640 / vw, 640 / vh), w = vw * s, h = vh * s;
   ctx.fillStyle = "#727272"; ctx.fillRect(0, 0, 640, 640);
@@ -55,7 +55,7 @@ function grabFrame(video: HTMLVideoElement, canvas: HTMLCanvasElement, tiny: HTM
   let sum = 0;
   for (let i = 0; i < px.length; i += 4) sum += 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
   const luma = sum / (px.length / 4) / 255;
-  return new Promise((res) => canvas.toBlob((blob) => res({ blob, luma }), "image/jpeg", 0.6));
+  return new Promise((res) => canvas.toBlob((blob) => res({ blob, luma, aspect: vw / vh }), "image/jpeg", 0.6));
 }
 
 type Opts = {
@@ -87,7 +87,7 @@ export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onH
     let pos: Pos | null = null;
     let prevFix: { lat: number; lng: number; t: number } | null = null;
     let lastFetch: { at: number; lat: number; lng: number; r: number } | null = null;
-    let lastFrame: Blob | null = null;
+    let lastFrame: { blob: Blob; aspect: number } | null = null;
     let current: { id: string; minD: number; warnM: number } | null = null;
     let lastHint = 0;
     let inFlight = 0;
@@ -111,11 +111,12 @@ export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onH
     void ensureRide();
     const rideTimer = setInterval(() => void ensureRide(), 5000);
 
-    const emit = (e: ServerEvent | null | undefined) => {
+    // `frame` is the picture the server just judged; the ride screen shows it as the "photo taken" moment.
+    const emit = (e: ServerEvent | null | undefined, frame?: { blob: Blob; aspect: number } | null) => {
       if (!e || stopped) return;
       resolved.add(e.potholeId); warned.add(e.potholeId);
       if (e.kind === "repaired") known.delete(e.potholeId);
-      live.current.onResult({ id: `${e.potholeId}-${e.kind}`, kind: e.kind, hazard: toHazard(e.hazard), street: e.street, lane: e.lane, severity: toSev(e.severity), at: Date.now() });
+      live.current.onResult({ id: `${e.potholeId}-${e.kind}`, kind: e.kind, hazard: toHazard(e.hazard), street: e.street, lane: e.lane, severity: toSev(e.severity), at: Date.now(), shot: frame ? URL.createObjectURL(frame.blob) : undefined, shotAspect: frame?.aspect });
     };
 
     const send = async (path: "/api/scan" | "/api/pass", frame: Blob, extra: Record<string, string> = {}) => {
@@ -213,7 +214,7 @@ export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onH
         const done = current;
         current = null; setUpcoming(null);
         // reached it but the camera never confirmed it: ask the server to judge the latest frame
-        if (k && done.minD < Math.max(PASS_M, pos.speed * 2) && !resolved.has(done.id) && lastFrame) void send("/api/pass", lastFrame, { potholeId: done.id }).then(emit);
+        if (k && done.minD < Math.max(PASS_M, pos.speed * 2) && !resolved.has(done.id) && lastFrame) { const f = lastFrame; void send("/api/pass", f.blob, { potholeId: done.id }).then((e) => emit(e, f)); }
         return;
       }
 
@@ -240,8 +241,8 @@ export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onH
       if (stopped || live.current.paused || !ride || !pos || !video || inFlight >= MAX_IN_FLIGHT || document.hidden) return;
       inFlight++;
       try {
-        const { blob, luma } = await grabFrame(video, canvas, tiny);
-        if (blob) { live.current.onLuma(luma); lastFrame = blob; emit(await send("/api/scan", blob)); }
+        const { blob, luma, aspect } = await grabFrame(video, canvas, tiny);
+        if (blob) { const f = { blob, aspect }; live.current.onLuma(luma); lastFrame = f; emit(await send("/api/scan", blob), f); }
       } finally { inFlight--; }
     }, FRAME_MS);
 
