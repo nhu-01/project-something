@@ -26,8 +26,9 @@ async function connect(): Promise<Client> {
   const schema = readFileSync(path.join(process.cwd(), "src/lib/server/schema.sql"), "utf8").replace(/--.*$/gm, "");
   for (const stmt of schema.split(";").map((s) => s.trim()).filter(Boolean)) await client.query(stmt);
   if (!local) {
-    // Tiger Data: make sightings a hypertable so time-bucketed stats stay fast. Harmless if it already is one.
-    await client.query("SELECT create_hypertable('sightings', 'at', if_not_exists => TRUE, migrate_data => TRUE)").catch(() => {});
+    // Tiger Data: the two time-series tables become hypertables. Harmless if they already are.
+    for (const table of ["sightings", "ride_points"])
+      await client.query(`SELECT create_hypertable('${table}', 'at', if_not_exists => TRUE, migrate_data => TRUE)`).catch(() => {});
   }
   return client;
 }

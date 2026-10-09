@@ -1,6 +1,7 @@
 import "server-only";
 import { query } from "@/lib/server/db";
-import type { Pothole, Severity, Sighting, SightingKind, Stats, Status } from "./types";
+import { meters } from "@/lib/server/geo";
+import type { Pothole, Severity, Sighting, SightingKind, Stats, Status, Track } from "./types";
 
 // The only place pages read potholes from. Everything here is real rider data from the database.
 type PRow = {
@@ -38,6 +39,37 @@ export async function getPothole(id: string): Promise<Pothole | null> {
   return shape(p, await query<SRow>("SELECT id, pothole_id, at, rider, kind, severity, note FROM sightings WHERE pothole_id=$1 ORDER BY at ASC", [id]));
 }
 
+const PRIVACY_TRIM_M = 150; // hide the start and end of every ride, so tracks don't point at anyone's home
+const GAP_M = 120; // a jump this big between breadcrumbs is a GPS glitch or a pause, not a ridden street
+
+// Where the app has been ridden in the last `days` days, as anonymous line segments.
+export async function getTracks(days = 30): Promise<Track[]> {
+  const rows = await query<{ ride_id: string; lat: number; lng: number }>(
+    `SELECT ride_id, lat, lng FROM ride_points WHERE at > now() - ($1 || ' days')::interval ORDER BY ride_id, at LIMIT 60000`,
+    [String(days)],
+  );
+  const byRide = new Map<string, [number, number][]>();
+  for (const r of rows) (byRide.get(r.ride_id) ?? byRide.set(r.ride_id, []).get(r.ride_id)!).push([r.lat, r.lng]);
+
+  const tracks: Track[] = [];
+  for (const pts of byRide.values()) {
+    if (pts.length < 2) continue;
+    const first = pts[0], last = pts[pts.length - 1];
+    const kept = pts.filter((p) => meters(p[0], p[1], first[0], first[1]) > PRIVACY_TRIM_M && meters(p[0], p[1], last[0], last[1]) > PRIVACY_TRIM_M);
+    let seg: Track = [];
+    for (const p of kept) {
+      const prev = seg[seg.length - 1];
+      if (prev && meters(prev[0], prev[1], p[0], p[1]) > GAP_M) { if (seg.length > 1) tracks.push(seg); seg = []; }
+      seg.push(p);
+    }
+    if (seg.length > 1) tracks.push(seg);
+  }
+  return tracks;
+}
+
+export const trackMiles = (tracks: Track[]) =>
+  tracks.reduce((sum, t) => sum + t.slice(1).reduce((d, p, i) => d + meters(t[i][0], t[i][1], p[0], p[1]), 0), 0) / 1609.344;
+
 export async function getStats(): Promise<Stats> {
   const [t] = await query<{ tracked: number; open: number; repaired: number; new_week: number; repaired_week: number }>(
     `SELECT COUNT(*)::int AS tracked,
@@ -66,7 +98,7 @@ export async function getStats(): Promise<Stats> {
      FROM potholes WHERE status='open' AND severity IS NOT NULL GROUP BY street ORDER BY AVG(severity) * COUNT(*) DESC LIMIT 5`,
   );
   return {
-    tracked: t.tracked, open: t.open, repaired: t.repaired, ridesThisWeek: r.n, newThisWeek: t.new_week, repairedThisWeek: t.repaired_week, daily,
+    tracked: t.tracked, open: t.open, repaired: t.repaired, ridesThisWeek: r.n, milesRidden: trackMiles(await getTracks(3650)), newThisWeek: t.new_week, repairedThisWeek: t.repaired_week, daily,
     worstStreets: worst.map((w) => ({ street: w.street, borough: w.borough, open: w.open, avgSeverity: w.avg })),
   };
 }

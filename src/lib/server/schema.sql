@@ -42,3 +42,12 @@ CREATE TABLE IF NOT EXISTS sightings (
 CREATE INDEX IF NOT EXISTS potholes_geo ON potholes (lat, lng);
 CREATE INDEX IF NOT EXISTS sightings_pothole ON sightings (pothole_id, at DESC);
 CREATE INDEX IF NOT EXISTS sightings_ride ON sightings (ride_id, pothole_id);
+
+-- GPS breadcrumbs for each ride: the "ridden streets" layer on the map. Anonymous (no rider label here).
+CREATE TABLE IF NOT EXISTS ride_points (
+  ride_id  TEXT NOT NULL,
+  at       TIMESTAMPTZ NOT NULL,
+  lat      DOUBLE PRECISION NOT NULL,
+  lng      DOUBLE PRECISION NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ride_points_ride ON ride_points (ride_id, at);

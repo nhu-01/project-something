@@ -10,14 +10,15 @@ export const dynamic = "force-dynamic";
 export default async function StatsPage() {
   const [stats, potholes] = await Promise.all([getStats(), getPotholes()]);
   const recentlyRepaired = potholes.filter((p) => p.status === "repaired").sort((a, b) => +new Date(b.lastSeen) - +new Date(a.lastSeen)).slice(0, 5);
-  const cards: [string, number][] = [["tracked", stats.tracked], ["open", stats.open], ["new this week", stats.newThisWeek], ["repaired this week", stats.repairedThisWeek]];
+  const miles = stats.milesRidden < 10 ? stats.milesRidden.toFixed(1) : String(Math.round(stats.milesRidden));
+  const cards: [string, number | string][] = [["tracked", stats.tracked], ["open", stats.open], ["new this week", stats.newThisWeek], ["repaired this week", stats.repairedThisWeek], ["miles ridden", miles]];
   return (
     <div className="wrap pt-10 sm:pt-16">
       <Reveal>
         <p className="eyebrow">progress · live from rider data</p>
         <h1 className="h2 mt-2 max-w-[20ch]">how the city&apos;s roads are doing.</h1>
       </Reveal>
-      <dl className="mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-3xl border border-line bg-line md:grid-cols-4">
+      <dl className="mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-3xl border border-line bg-line md:grid-cols-5">
         {cards.map(([k, v], i) => (<Reveal key={k} delay={i * 0.05} className="bg-card p-6"><dd className="text-4xl font-medium tracking-tight">{v}</dd><dt className="mt-1 text-sm text-muted">{k}</dt></Reveal>))}
       </dl>
       <Reveal delay={0.05} className="card mt-6 p-6 sm:p-8"><h2 className="mb-4 text-lg font-medium">last 14 days</h2><Bars data={stats.daily} /></Reveal>

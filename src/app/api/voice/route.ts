@@ -5,7 +5,7 @@ import { allPhrases, isLang, LANG_CODES, type Lang } from "@/lib/voice";
 export const maxDuration = 30;
 
 const PHRASES = Object.fromEntries(LANG_CODES.map((l) => [l, allPhrases(l)])) as Record<Lang, Set<string>>;
-const DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM"; // ElevenLabs premade voice "Rachel"
+const DEFAULT_VOICE = "SAz9YHcvj6GT2YYXdXww"; // ElevenLabs premade voice "River" (calm, neutral; usable on the free plan)
 
 // Speaks one of the app's fixed phrases, in the rider's language, with ElevenLabs' multilingual model.
 // Each phrase is generated once, then served from Blob.

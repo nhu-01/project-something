@@ -74,6 +74,8 @@ export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onH
     let lastFrame: Blob | null = null;
     let current: { id: string; minD: number } | null = null;
     let lastHint = 0;
+    let crumbs: { lat: number; lng: number; t: number }[] = [];
+    let lastCrumb: { lat: number; lng: number } | null = null;
     const known = new Map<string, Known>();
     const warned = new Set<string>();
     const resolved = new Set<string>(); // potholes that already got a result on this ride
@@ -128,12 +130,23 @@ export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onH
         if (prevFix && meters(prevFix, here) > 4) { heading = bearing(prevFix, here); prevFix = here; }
         if (!prevFix) prevFix = here;
         pos = { ...here, heading, accuracy: p.coords.accuracy ?? null };
+        // breadcrumb for the ridden-streets map: only decent fixes, only when we've actually moved
+        if ((p.coords.accuracy ?? 99) <= 35 && (!lastCrumb || meters(lastCrumb, here) > 8)) { lastCrumb = here; crumbs.push({ ...here, t: Date.now() }); }
         setGps("ok");
       },
       (err) => { if (err.code === err.PERMISSION_DENIED) setGps("denied"); },
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 },
     );
     if (watch == null) setGps("denied");
+
+    const flushCrumbs = (keepalive = false) => {
+      if (!ride || !crumbs.length) return;
+      const points = crumbs.splice(0, 80);
+      void fetch("/api/track", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ rideId: ride.rideId, token: ride.token, points }), keepalive })
+        .then((r) => { if (!r.ok) crumbs = [...points, ...crumbs].slice(-400); })
+        .catch(() => { crumbs = [...points, ...crumbs].slice(-400); }); // offline: keep them for the next try
+    };
+    const crumbTimer = setInterval(() => flushCrumbs(), 8000);
 
     // 3. warn about saved potholes ahead, and settle each one as the rider passes it
     const tick = setInterval(() => {
@@ -183,6 +196,8 @@ export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onH
     return () => {
       stopped = true;
       clearInterval(tick);
+      clearInterval(crumbTimer);
+      flushCrumbs(true);
       if (watch != null) navigator.geolocation.clearWatch(watch);
       setUpcoming(null); setGps("waiting");
       if (ride) void fetch(`/api/rides/${ride.rideId}/end`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: ride.token }), keepalive: true }).catch(() => {});

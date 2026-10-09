@@ -3,10 +3,10 @@ import L from "leaflet";
 import "leaflet.markercluster";
 import { useEffect, useRef } from "react";
 import { escapeHtml } from "@/lib/escape";
-import type { Pothole } from "@/lib/data/types";
+import type { Pothole, Track } from "@/lib/data/types";
 import { SEV_WORD } from "@/lib/tokens";
 
-type Props = { potholes: Pothole[]; selectedId: string | null; onSelect: (id: string) => void };
+type Props = { potholes: Pothole[]; tracks: Track[]; selectedId: string | null; onSelect: (id: string) => void };
 
 function pinIcon(p: Pothole, selected: boolean) {
   const sev = p.severity ?? 1;
@@ -18,10 +18,11 @@ function pinIcon(p: Pothole, selected: boolean) {
   });
 }
 
-export default function MapView({ potholes, selectedId, onSelect }: Props) {
+export default function MapView({ potholes, tracks, selectedId, onSelect }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const cluster = useRef<L.MarkerClusterGroup | null>(null);
+  const trackLayer = useRef<L.LayerGroup | null>(null);
   const markers = useRef(new Map<string, { marker: L.Marker; data: Pothole }>());
   const onSelectRef = useRef(onSelect);
   const fitted = useRef(false);
@@ -44,6 +45,9 @@ export default function MapView({ potholes, selectedId, onSelect }: Props) {
       },
     });
     m.addLayer(group);
+    // ridden streets sit under the pins; overlapping rides darken, like a heatmap
+    m.createPane("tracks").style.zIndex = "350";
+    trackLayer.current = L.layerGroup().addTo(m);
     // wheel zoom only after the map is clicked or focused, so the page never gets trapped
     m.on("click focus", () => m.scrollWheelZoom.enable());
     el.addEventListener("mouseleave", () => m.scrollWheelZoom.disable());
@@ -68,6 +72,18 @@ export default function MapView({ potholes, selectedId, onSelect }: Props) {
       fitted.current = true;
     }
   }, [potholes]);
+
+  useEffect(() => {
+    const layer = trackLayer.current, m = map.current;
+    if (!layer || !m) return;
+    layer.clearLayers();
+    const color = getComputedStyle(document.documentElement).getPropertyValue("--line-blue").trim() || "#0039a6";
+    for (const t of tracks) L.polyline(t, { pane: "tracks", color, weight: 5, opacity: 0.32, lineCap: "round", lineJoin: "round", interactive: false }).addTo(layer);
+    if (!fitted.current && !potholes.length && tracks.length) {
+      m.fitBounds(L.latLngBounds(tracks.flat() as L.LatLngTuple[]), { padding: [60, 60], maxZoom: 14 });
+      fitted.current = true;
+    }
+  }, [tracks, potholes.length]);
 
   useEffect(() => {
     const prev = prevSelected.current ? markers.current.get(prevSelected.current) : null;

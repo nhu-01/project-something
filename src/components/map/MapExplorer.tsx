@@ -1,17 +1,20 @@
 "use client";
 import { useCallback, useMemo, useState } from "react";
 import { Search } from "@/components/ui/Icons";
-import type { Pothole } from "@/lib/data/types";
+import type { Pothole, Track } from "@/lib/data/types";
 import DetailSheet from "./DetailSheet";
 import MapClient from "./MapClient";
 
 type StatusFilter = "all" | "open" | "repaired";
 const SEV_FILTERS = [{ label: "any severity", min: 1 }, { label: "3+ moderate", min: 3 }, { label: "4+ serious", min: 4 }];
 
-export default function MapExplorer({ potholes }: { potholes: Pothole[] }) {
+const NO_TRACKS: Track[] = [];
+
+export default function MapExplorer({ potholes, tracks }: { potholes: Pothole[]; tracks: Track[] }) {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [minSev, setMinSev] = useState(1);
   const [q, setQ] = useState("");
+  const [showTracks, setShowTracks] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const visible = useMemo(() => {
@@ -27,7 +30,7 @@ export default function MapExplorer({ potholes }: { potholes: Pothole[] }) {
 
   return (
     <div className="map-shell relative h-[calc(100dvh-64px)] w-full">
-      <MapClient potholes={visible} selectedId={selected?.id ?? null} onSelect={setSelectedId} />
+      <MapClient potholes={visible} tracks={showTracks ? tracks : NO_TRACKS} selectedId={selected?.id ?? null} onSelect={setSelectedId} />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[1000] flex flex-col gap-3 p-3 sm:p-4 md:max-w-[calc(100%-420px)]">
         <label className="pointer-events-auto flex h-12 max-w-md items-center gap-3 rounded-full border border-line bg-card/95 px-4 shadow-[0_6px_24px_rgb(32_33_30/0.08)] backdrop-blur">
@@ -43,6 +46,10 @@ export default function MapExplorer({ potholes }: { potholes: Pothole[] }) {
           {SEV_FILTERS.map((f) => (
             <button key={f.min} className="chip shadow-sm" aria-pressed={minSev === f.min} onClick={() => setMinSev(f.min)}>{f.label}</button>
           ))}
+          <span className="mx-1 hidden w-px bg-line sm:block" aria-hidden />
+          <button className="chip shadow-sm" aria-pressed={showTracks} onClick={() => setShowTracks((v) => !v)}>
+            <span className="h-1 w-4 rounded-full bg-repaired" aria-hidden />ridden streets
+          </button>
         </div>
       </div>
 

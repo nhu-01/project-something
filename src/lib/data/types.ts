@@ -30,11 +30,15 @@ export type Pothole = {
   photo?: string; // rider camera frame
 };
 
+// A stretch of street someone rode with the app on, as [lat, lng] pairs.
+export type Track = [number, number][];
+
 export type Stats = {
   tracked: number;
   open: number;
   repaired: number;
   ridesThisWeek: number;
+  milesRidden: number;
   newThisWeek: number;
   repairedThisWeek: number;
   daily: { day: string; found: number; repaired: number }[];
