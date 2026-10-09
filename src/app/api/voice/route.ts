@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   const key = process.env.ELEVENLABS_API_KEY;
   if (!key) return new Response("voice not configured", { status: 501 });
   const voice = process.env.ELEVENLABS_VOICE_ID || DEFAULT_VOICE;
-  const useBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  const useBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN) && process.env.USE_LOCAL_DB !== "1";
   const pathname = `voice/${voice}/${lang}/${createHash("sha1").update(text).digest("hex")}.mp3`;
 
   if (useBlob) {

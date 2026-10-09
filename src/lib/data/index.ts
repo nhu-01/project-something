@@ -86,7 +86,10 @@ export async function getStats(): Promise<Stats> {
             COUNT(*) FILTER (WHERE status='repaired' AND last_seen > now() - interval '7 days')::int AS repaired_week
      FROM potholes`,
   );
-  const [r] = await query<{ n: number }>("SELECT COUNT(*)::int AS n FROM rides WHERE started_at > now() - interval '7 days'");
+  // Only real rides: started from the ride screen and with GPS breadcrumbs. Photo reports and empty sessions don't count.
+  const [r] = await query<{ n: number }>(
+    "SELECT COUNT(*)::int AS n FROM rides r WHERE r.source = 'ride' AND r.started_at > now() - interval '7 days' AND EXISTS (SELECT 1 FROM ride_points p WHERE p.ride_id = r.id)",
+  );
   const days = await query<{ day: string | Date; found: number; repaired: number }>(
     `SELECT date_trunc('day', at) AS day,
             COUNT(*) FILTER (WHERE kind='first_seen')::int AS found,

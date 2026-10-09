@@ -5,15 +5,18 @@ next rider on the same path is warned and updates what we know. Non-riders use t
 Domain: spotholes.nyc. See @DESIGN.md for the design system (cream paper, ink, Hanken Grotesk, pill shapes).
 
 ## Status
-Frontend first. Screens run on typed sample data behind `src/lib/data/`; the backend (Tiger Data, Gemini, ElevenLabs, YOLO)
-gets wired in later, then deployment. An earlier full-backend attempt lives on branch `feat/initial-build` (YOLO model, pipeline).
+Live at spotholes.vercel.app (domain spotholes.nyc still to be pointed at it). Everything shown is real rider data:
+there is no sample, demo or seed data anywhere, and none should be added. An earlier attempt lives on `feat/initial-build`.
 
 ## Stack
 Next.js (App Router, TypeScript strict), Tailwind v4, Leaflet + markercluster (map), `motion` (UI animation).
+Backend: Tiger Data (Postgres), Gemini (judges frames), a YOLO first pass (onnxruntime-web), ElevenLabs (voice), Vercel Blob (photos).
 Read `node_modules/next/dist/docs/` before using Next APIs: this version differs from older ones.
 
 ## Rules
-- Components get data only through `src/lib/data/`. Sample data lives in `src/data/sample.ts` and is labeled "sample data" in the UI.
+- Pages get data only through `src/lib/data/` (server-only, reads the database). Never add sample or placeholder records.
+- Local dev uses an embedded database and local photo files (`USE_LOCAL_DB=1`), so tests never touch live data. Don't test
+  against production by creating hazards; use refusal paths or the local database.
 - Never put an API key or secret in browser code. Never commit `.env*`.
 - Use design tokens; no hard-coded colors. Respect `prefers-reduced-motion`. Status/severity are text, not just color.
 - Safety: the ride screen must tell riders to mount the phone before moving and never to handle it while moving.

@@ -56,4 +56,4 @@ Visible focus (moss ring), 44px minimum targets, status and severity always writ
 captions/voice never the only channel, safe-use warnings on the ride screen.
 
 ## Voice
-Short, lowercase, calm: "start a ride", "pothole ahead, right lane", "looks repaired". Never present sample data as real.
+Short, lowercase, calm: "start a ride", "pothole ahead, right lane", "looks repaired". Everything shown is real rider data; never add sample data.
