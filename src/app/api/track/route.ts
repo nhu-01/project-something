@@ -1,5 +1,5 @@
 import { query } from "@/lib/server/db";
-import { inNyc } from "@/lib/server/geo";
+import { validPoint } from "@/lib/server/geo";
 import { bad } from "@/lib/server/http";
 import { authRide } from "@/lib/server/rides";
 
@@ -13,7 +13,8 @@ export async function POST(req: Request) {
   const now = Date.now();
   const points = (Array.isArray(body?.points) ? body.points : []).slice(0, 80)
     .map((p) => ({ lat: Number(p.lat), lng: Number(p.lng), t: Number(p.t) }))
-    .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng) && inNyc(p.lat, p.lng) && Number.isFinite(p.t) && Math.abs(now - p.t) < 15 * 60 * 1000);
+    // breadcrumbs can arrive late after a stretch with no signal, so accept anything from the last 12 hours
+    .filter((p) => validPoint(p.lat, p.lng) && Number.isFinite(p.t) && p.t <= now + 60_000 && now - p.t < 12 * 3600 * 1000);
   if (!points.length) return Response.json({ saved: 0 });
   const values = points.map((_, i) => `($1, to_timestamp($${i * 3 + 2}::double precision / 1000), $${i * 3 + 3}, $${i * 3 + 4})`).join(",");
   await query(`INSERT INTO ride_points (ride_id, at, lat, lng) VALUES ${values}`, [ride.id, ...points.flatMap((p) => [p.t, p.lat, p.lng])]);

@@ -26,6 +26,7 @@ export default async function Home() {
               <Link href="/ride" className="pill pill-ink">start a ride <ArrowUpRight /></Link>
               <Link href="/map" className="pill pill-line">see the map <ArrowUpRight /></Link>
             </div>
+            <p className="mt-4 text-sm text-muted">not riding? <Link href="/report" className="underline underline-offset-4">report a spot by photo</Link></p>
           </Reveal>
         </div>
         <div className="mx-auto mt-10 max-w-[1100px] sm:mt-14"><HeroScene /></div>

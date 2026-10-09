@@ -39,7 +39,9 @@ under ~15 cm. 3 clear hole, ridge or broken patch 15-30 cm, a real jolt. 4 deep 
 riders swerve. 5 very large or deep, a serious hazard.
 Not hazards: shadows, puddles, stains, painted markings, and flush, level manhole covers or drains.
 If the surface looks smooth and rideable, pothole_present=false and hazard_type="none". If unsure, say false with confidence "low".
-Still judge pothole_present for what the picture shows, even when screen_or_print is true.`;
+Still judge pothole_present for what the picture shows, even when screen_or_print is true.
+A plain photo taken straight from a phone camera, looking down at the ground, is NOT a screen or print. Only say
+screen_or_print=true when you can actually see the device, its bezel, on-screen interface, pixels or moire, or paper edges.`;
 
 export async function judgeFrame(frame: Buffer): Promise<Verdict> {
   const key = process.env.GEMINI_API_KEY;

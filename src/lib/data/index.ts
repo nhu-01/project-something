@@ -43,12 +43,12 @@ export async function getPothole(id: string): Promise<Pothole | null> {
 // Hide the start and end of every ride, so tracks don't point at anyone's home: 12% of the ride at each end,
 // at least 25 m and at most 150 m.
 const trimFor = (lengthM: number) => Math.min(150, Math.max(25, lengthM * 0.12));
-const GAP_M = 120; // a jump this big between breadcrumbs is a GPS glitch or a pause, not a ridden street
+const GAP_M = 400; // a jump this big between breadcrumbs is a GPS glitch or a pause (fast riders legitimately cover ~30 m/s)
 
 // Where the app has been ridden in the last `days` days, as anonymous line segments.
 export async function getTracks(days = 30): Promise<Track[]> {
   const rows = await query<{ ride_id: string; lat: number; lng: number }>(
-    `SELECT ride_id, lat, lng FROM ride_points WHERE at > now() - ($1 || ' days')::interval ORDER BY ride_id, at LIMIT 60000`,
+    `SELECT ride_id, lat, lng FROM ride_points WHERE at > now() - ($1 || ' days')::interval ORDER BY ride_id, at LIMIT 400000`,
     [String(days)],
   );
   const byRide = new Map<string, [number, number][]>();
@@ -64,7 +64,9 @@ export async function getTracks(days = 30): Promise<Track[]> {
     let seg: Track = [];
     for (const p of kept) {
       const prev = seg[seg.length - 1];
-      if (prev && meters(prev[0], prev[1], p[0], p[1]) > GAP_M) { if (seg.length > 1) tracks.push(seg); seg = []; }
+      const step = prev ? meters(prev[0], prev[1], p[0], p[1]) : Infinity;
+      if (prev && step > GAP_M) { if (seg.length > 1) tracks.push(seg); seg = []; }
+      else if (prev && step < 12) continue; // closer than this adds nothing you can see on the map
       seg.push(p);
     }
     if (seg.length > 1) tracks.push(seg);

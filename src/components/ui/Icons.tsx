@@ -5,4 +5,7 @@ export const Close = () => (<svg {...p}><path d="M6 6l12 12M18 6 6 18" /></svg>)
 export const Search = () => (<svg {...p}><circle cx="11" cy="11" r="6.5" /><path d="m20 20-3.5-3.5" /></svg>);
 export const Pause = () => (<svg {...p}><path d="M9 6v12M15 6v12" /></svg>);
 export const Check = () => (<svg {...p}><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>);
+export const Flashlight = () => (<svg {...p}><path d="M8 3h8v4l-2 3v10a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V10L8 7V3Z" /><path d="M8 7h8M12 13v2" /></svg>);
+export const Camera = () => (<svg {...p}><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" /><circle cx="12" cy="13" r="3.5" /></svg>);
+export const Pin = () => (<svg {...p}><path d="M12 21s7-6.2 7-11.5a7 7 0 1 0-14 0C5 14.8 12 21 12 21Z" /><circle cx="12" cy="9.5" r="2.5" /></svg>);
 export const Volume = () => (<svg {...p}><path d="M4 10v4h4l5 4V6L8 10H4Z" /><path d="M16.5 9a4 4 0 0 1 0 6" /></svg>);

@@ -45,7 +45,24 @@ export default function RideScreen() {
     setNotice("that looks like a picture, not the road. nothing was logged.");
     speech.say(screenPhrase(lang), lang);
   }, [speech, lang]);
-  const { upcoming, distance, gps, online, meters } = useRideEngine({ active: riding, paused, videoRef: camera.ref, onAhead, onResult, onHint });
+  // Night riding: after a few dark frames in a row, switch the flashlight on (where the browser allows it).
+  // Once the rider touches the flashlight button, we leave it alone for the rest of the ride.
+  const dark = useRef({ frames: 0, manual: false, warned: false });
+  const { torchSupported, torchOn, setTorch } = camera;
+  const onLuma = useCallback((luma: number) => {
+    const d = dark.current;
+    d.frames = luma < 0.16 ? d.frames + 1 : 0;
+    if (d.frames < 3 || d.manual) return;
+    if (torchSupported && !torchOn) {
+      d.frames = 0;
+      void setTorch(true).then((ok) => { if (ok) setNotice("it's dark, so the flashlight is on."); });
+    } else if (!torchSupported && !d.warned) {
+      d.warned = true;
+      setNotice("it's dark, and this browser won't let the site turn on the flashlight. detection may miss things.");
+    }
+  }, [torchSupported, torchOn, setTorch]);
+  const toggleTorch = () => { dark.current.manual = true; void setTorch(!torchOn); };
+  const { upcoming, distance, gps, online, meters } = useRideEngine({ active: riding, paused, videoRef: camera.ref, onAhead, onResult, onHint, onLuma });
 
   // brief "starting" step so permission prompts happen after the tap
   useEffect(() => {
@@ -66,6 +83,7 @@ export default function RideScreen() {
 
   const start = () => {
     speech.unlock();
+    dark.current = { frames: 0, manual: false, warned: false };
     setEvents([]); setLast(null); setNotice(null); setPaused(false); setPhase("starting");
     // spoken right away, inside the tap: confirms audio works and tells the rider what happens next
     speech.say(cuePhrase(lang, "start"), lang);
@@ -84,6 +102,7 @@ export default function RideScreen() {
   return (
     <RideHud
       camera={camera.state} gps={gps} online={online} videoRef={camera.ref} upcoming={upcoming} distance={distance} last={last} notice={notice} paused={paused}
+      torch={torchSupported ? torchOn : null} onToggleTorch={toggleTorch}
       voiceOn={speech.on} count={events.length} onTogglePause={() => setPaused((p) => !p)} onToggleVoice={() => speech.setOn(!speech.on)} onEnd={end}
     />
   );

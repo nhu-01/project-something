@@ -12,6 +12,7 @@ export default function Nav() {
         </Link>
         <div className="flex items-center gap-1 text-[15px]">
           <Link href="/map" className="rounded-full px-3 py-2 text-muted transition-colors hover:text-ink">map</Link>
+          <Link href="/report" className="hidden rounded-full px-3 py-2 text-muted transition-colors hover:text-ink sm:block">report</Link>
           <Link href="/stats" className="hidden rounded-full px-3 py-2 text-muted transition-colors hover:text-ink sm:block">progress</Link>
           <Link href="/ride" className="pill pill-ink ml-2 !min-h-10 !px-4 whitespace-nowrap text-sm">start a ride</Link>
         </div>

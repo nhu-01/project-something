@@ -2,34 +2,74 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LANGS, type Lang } from "@/lib/voice";
 
+type TorchTrack = MediaStreamTrack & { getCapabilities?: () => MediaTrackCapabilities & { torch?: boolean } };
+
 // Camera preview for the ride screen. Failure is non-fatal: the ride continues without video.
+// Phones stop the camera when the page is backgrounded, so it is restarted when the page comes back.
 export function useCamera(active: boolean) {
   const ref = useRef<HTMLVideoElement>(null);
+  const track = useRef<TorchTrack | null>(null);
   const [state, setState] = useState<"idle" | "on" | "denied">("idle");
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
   useEffect(() => {
     if (!active) return;
     let stream: MediaStream | null = null;
     let cancelled = false;
-    navigator.mediaDevices?.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false })
+    navigator.mediaDevices?.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }, audio: false })
       .then((s) => {
         if (cancelled) { s.getTracks().forEach((t) => t.stop()); return; }
         stream = s;
+        const t = s.getVideoTracks()[0] as TorchTrack | undefined;
+        track.current = t ?? null;
+        let caps: { torch?: boolean } = {};
+        try { caps = (t?.getCapabilities?.() ?? {}) as { torch?: boolean }; } catch { /* not supported */ }
+        setTorchSupported(Boolean(caps.torch));
+        // if the phone kills the camera (lock screen, another app), try again when we're visible
+        t?.addEventListener("ended", () => { if (!cancelled && !document.hidden) setAttempt((n) => n + 1); });
         if (ref.current) { ref.current.srcObject = s; void ref.current.play().catch(() => {}); }
         setState("on");
       })
       .catch(() => !cancelled && setState("denied"));
-    return () => { cancelled = true; stream?.getTracks().forEach((t) => t.stop()); setState("idle"); };
-  }, [active]);
-  return { ref, state };
+    const onVisible = () => { if (!document.hidden && (!stream || stream.getVideoTracks().every((t) => t.readyState === "ended"))) setAttempt((n) => n + 1); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      stream?.getTracks().forEach((t) => t.stop());
+      track.current = null;
+      setState("idle"); setTorchOn(false); setTorchSupported(false);
+    };
+  }, [active, attempt]);
+
+  // The phone's flashlight, where the browser allows a site to control it.
+  const setTorch = useCallback(async (on: boolean) => {
+    const t = track.current;
+    if (!t) return false;
+    try {
+      await t.applyConstraints({ advanced: [{ torch: on } as MediaTrackConstraintSet] });
+      setTorchOn(on);
+      return true;
+    } catch { return false; }
+  }, []);
+
+  return { ref, state, torchSupported, torchOn, setTorch };
 }
 
-// Keeps the screen awake during a ride (iOS 16.4+ Safari). Best effort.
+// Keeps the screen awake during a ride (iOS 16.4+ Safari). The lock is dropped whenever the page is hidden,
+// so it is taken again each time the page comes back.
 export function useWakeLock(active: boolean) {
   useEffect(() => {
     if (!active || !("wakeLock" in navigator)) return;
     let lock: WakeLockSentinel | null = null;
-    navigator.wakeLock.request("screen").then((l) => { lock = l; }).catch(() => {});
-    return () => { void lock?.release().catch(() => {}); };
+    let cancelled = false;
+    const take = () => { navigator.wakeLock.request("screen").then((l) => { if (cancelled) void l.release().catch(() => {}); else lock = l; }).catch(() => {}); };
+    const onVisible = () => { if (!document.hidden) take(); };
+    take();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { cancelled = true; document.removeEventListener("visibilitychange", onVisible); void lock?.release().catch(() => {}); };
   }, [active]);
 }
 

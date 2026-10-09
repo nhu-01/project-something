@@ -45,3 +45,34 @@ export async function damageConfidence(frame: Buffer): Promise<number> {
   }
   return max;
 }
+
+// The detector needs a square frame, so the phone pads the camera image with flat gray bars. Those bars make a real
+// photo look like a picture-in-a-frame to Gemini, so they are cut off again before Gemini sees it.
+const PAD = 0x72, PAD_TOLERANCE = 10;
+export function stripPadding(frame: Buffer): Buffer {
+  const img = jpeg.decode(frame, { useTArray: true, formatAsRGBA: true });
+  const { width: w, height: h, data } = img;
+  const isPad = (x: number, y: number) => {
+    const i = (y * w + x) * 4;
+    return Math.abs(data[i] - PAD) <= PAD_TOLERANCE && Math.abs(data[i + 1] - PAD) <= PAD_TOLERANCE && Math.abs(data[i + 2] - PAD) <= PAD_TOLERANCE;
+  };
+  // a row or column counts as padding when (nearly) every sampled pixel on it is the padding gray
+  const colPad = (x: number) => { let n = 0; for (let y = 4; y < h; y += 16) if (isPad(x, y)) n++; return n >= Math.floor((h - 4) / 16) * 0.97; };
+  const rowPad = (y: number) => { let n = 0; for (let x = 4; x < w; x += 16) if (isPad(x, y)) n++; return n >= Math.floor((w - 4) / 16) * 0.97; };
+  let left = 0, right = w - 1, top = 0, bottom = h - 1;
+  while (left < right && colPad(left)) left++;
+  while (right > left && colPad(right)) right--;
+  while (top < bottom && rowPad(top)) top++;
+  while (bottom > top && rowPad(bottom)) bottom--;
+  // JPEG blurs the edge of the bars a little, so shave a few more pixels
+  if (left > 0) left = Math.min(right, left + 3);
+  if (right < w - 1) right = Math.max(left, right - 3);
+  if (top > 0) top = Math.min(bottom, top + 3);
+  if (bottom < h - 1) bottom = Math.max(top, bottom - 3);
+  const cw = right - left + 1, ch = bottom - top + 1;
+  if (cw === w && ch === h) return frame; // nothing to cut
+  if (cw < 64 || ch < 64) return frame; // a nearly all-gray scene: leave it alone
+  const out = Buffer.alloc(cw * ch * 4);
+  for (let y = 0; y < ch; y++) out.set(data.subarray(((y + top) * w + left) * 4, ((y + top) * w + left + cw) * 4), y * cw * 4);
+  return Buffer.from(jpeg.encode({ data: out, width: cw, height: ch }, 85).data);
+}

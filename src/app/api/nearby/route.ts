@@ -6,6 +6,8 @@ export async function GET(req: Request) {
   const u = new URL(req.url);
   const lat = Number(u.searchParams.get("lat")), lng = Number(u.searchParams.get("lng"));
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return bad("lat and lng required");
-  const rows = await nearbyOpen(lat, lng, 600);
+  // faster riders ask for a wider radius
+  const r = Math.min(3000, Math.max(200, Number(u.searchParams.get("r")) || 600));
+  const rows = await nearbyOpen(lat, lng, r);
   return Response.json(rows.map((p) => ({ id: String(p.id), lat: p.lat, lng: p.lng, street: p.street, lane: p.lane, severity: p.severity ?? 2, kind: p.kind })), { headers: { "cache-control": "no-store" } });
 }

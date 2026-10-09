@@ -1,7 +1,7 @@
 "use client";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
-import { Pause, Volume } from "@/components/ui/Icons";
+import { Flashlight, Pause, Volume } from "@/components/ui/Icons";
 import { SeverityBullet } from "@/components/ui/Bullet";
 import { HAZARD_LABEL, SEV_WORD } from "@/lib/tokens";
 import type { GpsState, RideEvent, Upcoming } from "./types";
@@ -27,13 +27,15 @@ type Props = {
   notice: string | null;
   paused: boolean;
   voiceOn: boolean;
+  torch: boolean | null; // null when this browser can't control the flashlight
+  onToggleTorch: () => void;
   count: number;
   onTogglePause: () => void;
   onToggleVoice: () => void;
   onEnd: () => void;
 };
 
-export default function RideHud({ camera, gps, online, videoRef, upcoming, distance, last, notice, paused, voiceOn, count, onTogglePause, onToggleVoice, onEnd }: Props) {
+export default function RideHud({ camera, gps, online, videoRef, upcoming, distance, last, notice, paused, voiceOn, torch, onToggleTorch, count, onTogglePause, onToggleVoice, onEnd }: Props) {
   const reduce = useReducedMotion();
   const elapsed = useElapsed(!paused);
   const mm = String(Math.floor(elapsed / 60)).padStart(2, "0"), ss = String(elapsed % 60).padStart(2, "0");
@@ -58,6 +60,7 @@ export default function RideHud({ camera, gps, online, videoRef, upcoming, dista
         </div>
         <div className="flex items-center gap-2">
           <div className="rounded-full bg-paper/90 px-4 py-2 text-sm text-ink backdrop-blur">{count} logged</div>
+          {torch !== null && <button onClick={onToggleTorch} aria-pressed={torch} aria-label={torch ? "turn flashlight off" : "turn flashlight on"} className={`grid h-11 w-11 place-items-center rounded-full backdrop-blur ${torch ? "bg-paper/90 text-ink" : "bg-paper/30 text-paper"}`}><Flashlight /></button>}
           <button onClick={onToggleVoice} aria-pressed={voiceOn} aria-label={voiceOn ? "mute voice" : "unmute voice"} className={`grid h-11 w-11 place-items-center rounded-full backdrop-blur ${voiceOn ? "bg-paper/90 text-ink" : "bg-paper/30 text-paper"}`}><Volume /></button>
         </div>
       </div>

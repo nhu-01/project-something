@@ -30,14 +30,17 @@ function toSegment(p: LatLng, a: LatLng, b: LatLng) {
 
 export async function hazardsOnTheWay(from: LatLng, to: LatLng) {
   const routed = await bikeRoute(from, to);
-  const line = routed ?? [from, to];
+  // very long routes come back with thousands of points; thin them so matching stays fast
+  const full = routed ?? [from, to];
+  const step = Math.max(1, Math.ceil(full.length / 1500));
+  const line = full.filter((_, i) => i % step === 0 || i === full.length - 1);
   const corridorM = routed ? 30 : 180; // a real route can be tight; a straight line has to be generous
 
   const lats = line.map((p) => p[0]), lngs = line.map((p) => p[1]);
   const [minLat, , minLng] = bbox(Math.min(...lats), Math.min(...lngs), corridorM);
   const [, maxLat, , maxLng] = bbox(Math.max(...lats), Math.max(...lngs), corridorM);
   const rows = await query<{ id: number; lat: number; lng: number; kind: string; street: string; lane: string; severity: number | null }>(
-    "SELECT id, lat, lng, kind, street, lane, severity FROM potholes WHERE status='open' AND lat BETWEEN $1 AND $2 AND lng BETWEEN $3 AND $4 LIMIT 3000",
+    "SELECT id, lat, lng, kind, street, lane, severity FROM potholes WHERE status='open' AND lat BETWEEN $1 AND $2 AND lng BETWEEN $3 AND $4 LIMIT 20000",
     [minLat, maxLat, minLng, maxLng],
   );
 

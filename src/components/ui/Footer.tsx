@@ -7,7 +7,7 @@ export default function Footer() {
       </div>
       <div className="wrap flex flex-col gap-3 pb-8 pt-4 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
         <span>spotholes.nyc · an independent project, not affiliated with the city of new york</span>
-        <span>severity and size are ai estimates · never handle your phone while moving</span>
+        <span><a href="/report" className="underline underline-offset-4">report a spot by photo</a> · severity and size are ai estimates · never handle your phone while moving</span>
       </div>
     </footer>
   );
