@@ -10,11 +10,10 @@ type Props = { potholes: Pothole[]; selectedId: string | null; onSelect: (id: st
 
 function pinIcon(p: Pothole, selected: boolean) {
   const sev = p.severity ?? 1;
-  const size = 12 + sev * 3;
   const label = escapeHtml(`pothole on ${p.street}, ${p.status === "repaired" ? "appears repaired" : `severity ${sev}, ${SEV_WORD[sev]}`}`);
   return L.divIcon({
     className: "pin-wrap",
-    html: `<button type="button" class="pin${selected ? " pin--selected" : ""}${p.status === "repaired" ? " pin--repaired" : ""}" style="--pin-color:var(--sev-${sev});--pin-size:${size}px" aria-label="${label}"><span class="pin-dot"></span></button>`,
+    html: `<button type="button" class="pin${selected ? " pin--selected" : ""}${p.status === "repaired" ? " pin--repaired" : ""}" style="--pin-color:var(--sev-${sev});--pin-text:${sev <= 2 ? "var(--ink)" : "#fff"}" aria-label="${label}"><span class="pin-dot" aria-hidden="true">${p.status === "repaired" ? "✓" : sev}</span></button>`,
     iconSize: [44, 44], iconAnchor: [22, 22],
   });
 }

@@ -14,13 +14,13 @@ export default function Bars({ data }: { data: Stats["daily"] }) {
           return (
             <g key={d.day}>
               <rect x={x + bw * 0.12} y={H - h1} width={bw * 0.34} height={Math.max(h1, 0)} rx="4" fill="var(--ink)" />
-              <rect x={x + bw * 0.5} y={H - h2} width={bw * 0.34} height={Math.max(h2, 0)} rx="4" fill="var(--moss)" />
+              <rect x={x + bw * 0.5} y={H - h2} width={bw * 0.34} height={Math.max(h2, 0)} rx="4" fill="var(--repaired)" />
               {i % 2 === 0 && <text x={x + bw / 2} y={H + 20} textAnchor="middle" fontSize="11" fill="var(--muted)">{d.day}</text>}
             </g>
           );
         })}
       </svg>
-      <figcaption className="mt-2 flex gap-5 text-sm text-muted"><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-ink" />found</span><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-moss" />repaired</span></figcaption>
+      <figcaption className="mt-2 flex gap-5 text-sm text-muted"><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-ink" />found</span><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-repaired" />repaired</span></figcaption>
     </figure>
   );
 }

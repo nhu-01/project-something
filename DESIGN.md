@@ -20,7 +20,23 @@ a map. Tagline: *ride. the city remembers.*
 | `--moss` | `#42644C` | focus ring, "repaired" |
 | `--card` | `#FFFFFF` | cards, sheets |
 
-Severity scale (data only, 1 to 5, always paired with the number): `--sev-1 #D9D0C1`, `--sev-2 #CDAE7E`, `--sev-3 #C4833F`, `--sev-4 #B4532B`, `--sev-5 #8C2F1C`.
+### Subway colors
+The city's subway line colors are the only color on the site, used sparingly as small **bullets** (a colored circle with a
+number), never as backgrounds or large fills:
+
+| Use | Color |
+|---|---|
+| Severity 1 minor | lime `#6CBE45` (dark number) |
+| Severity 2 light | yellow `#FCCC0A` (dark number) |
+| Severity 3 moderate | orange `#FF6319` |
+| Severity 4 serious | red `#EE352E` |
+| Severity 5 severe | purple `#B933AD` |
+| Repaired | blue `#0039A6` |
+| Accent (wordmark dot, step and rider bullets) | red `#EE352E` |
+
+Also defined as tokens: green `#00933C`, brown `#996633`, gray `#A7A9AC`, slate `#808183`, teal `#00ADD0`.
+Rules: a bullet always carries its number or sits beside the word, so color is never the only signal. Repaired is blue,
+not green, so it is never confused with a severity. These are plain colored circles; never use MTA logos or line letters.
 
 ## Type
 Hanken Grotesk everywhere (via `next/font`). Mostly lowercase. Display `clamp(40px, 7vw, 84px)`, weight 500, tracking -0.03em.

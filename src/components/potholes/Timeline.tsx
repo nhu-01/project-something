@@ -12,7 +12,7 @@ export default function Timeline({ sightings }: { sightings: Sighting[] }) {
         return (
           <li key={s.id} className="relative">
             <span className="absolute -left-[31px] top-1.5 grid h-3 w-3 place-items-center rounded-full border border-ink bg-paper" aria-hidden>
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: good ? "var(--moss)" : "var(--ink)" }} />
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: good ? "var(--repaired)" : "var(--ink)" }} />
             </span>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="font-medium">{KIND_LABEL[s.kind]}</span>

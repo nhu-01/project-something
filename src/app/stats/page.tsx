@@ -39,7 +39,7 @@ export default async function StatsPage() {
           <ul className="mt-4 divide-y divide-line">
             {recentlyRepaired.length === 0 && <li className="py-3 text-muted">nothing yet.</li>}
             {recentlyRepaired.map((p) => (
-              <li key={p.id}><Link href={`/potholes/${p.id}`} className="flex items-center justify-between gap-4 py-3 transition-colors hover:text-moss"><span><span className="font-medium">{p.street}</span><span className="block text-sm text-muted">{p.borough}</span></span><span className="text-sm text-muted">{ago(p.lastSeen)}</span></Link></li>
+              <li key={p.id}><Link href={`/potholes/${p.id}`} className="flex items-center justify-between gap-4 py-3 transition-colors hover:text-repaired"><span><span className="font-medium">{p.street}</span><span className="block text-sm text-muted">{p.borough}</span></span><span className="text-sm text-muted">{ago(p.lastSeen)}</span></Link></li>
             ))}
           </ul>
         </Reveal>

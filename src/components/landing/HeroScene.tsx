@@ -61,8 +61,8 @@ export default function HeroScene() {
                   <animate attributeName="r" dur={dur} repeatCount="indefinite" values="7;7;34;34" keyTimes={seq([0, s1, s1 + 0.07, 1])} />
                   <animate attributeName="opacity" dur={dur} repeatCount="indefinite" values="0;0.55;0;0" keyTimes={seq([0, s1, s1 + 0.07, 1])} />
                 </circle>
-                {/* rider 2 confirms: moss ripple */}
-                <circle cx={p.x} cy={p.y} fill="none" stroke="var(--moss)" strokeWidth="2" r="7" opacity="0">
+                {/* rider 2 confirms: blue ripple */}
+                <circle cx={p.x} cy={p.y} fill="none" stroke="var(--repaired)" strokeWidth="2" r="7" opacity="0">
                   <animate attributeName="r" dur={dur} repeatCount="indefinite" values="7;7;34;34" keyTimes={seq([0, s2, s2 + 0.07, 1])} />
                   <animate attributeName="opacity" dur={dur} repeatCount="indefinite" values="0;0.7;0;0" keyTimes={seq([0, s2, s2 + 0.07, 1])} />
                 </circle>
@@ -83,13 +83,13 @@ export default function HeroScene() {
           {/* rider 1 */}
           <g opacity="0">
             <animate attributeName="opacity" dur={dur} repeatCount="indefinite" values="0;1;1;0;0" keyTimes={seq([0, 0.015, R1_END, R1_END + 0.02, 1])} />
-            <circle r="9" fill="var(--ink)" /><circle r="3" fill="var(--paper)" />
+            <circle r="13" fill="var(--line-red)" /><text y="5" textAnchor="middle" fontSize="15" fontWeight="700" fill="#fff" fontFamily="var(--font-hanken), sans-serif">1</text>
             <animateMotion dur={dur} repeatCount="indefinite" keyPoints="0;1;1" keyTimes={seq([0, R1_END, 1])} calcMode="linear"><mpath href="#route" /></animateMotion>
           </g>
           {/* rider 2 */}
           <g opacity="0">
             <animate attributeName="opacity" dur={dur} repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes={seq([0, R2_START, R2_START + 0.015, R2_END, R2_END + 0.02, 1])} />
-            <circle r="9" fill="var(--moss)" /><circle r="3" fill="var(--paper)" />
+            <circle r="13" fill="var(--line-red)" /><text y="5" textAnchor="middle" fontSize="15" fontWeight="700" fill="#fff" fontFamily="var(--font-hanken), sans-serif">2</text>
             <animateMotion dur={dur} repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes={seq([0, R2_START, R2_END, 1])} calcMode="linear"><mpath href="#route" /></animateMotion>
           </g>
           {/* captions */}

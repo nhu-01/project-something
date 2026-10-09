@@ -2,6 +2,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
 import { Pause, Volume } from "@/components/ui/Icons";
+import { SeverityBullet } from "@/components/ui/Bullet";
 import { SEV_WORD } from "@/lib/tokens";
 import type { GpsState, RideEvent, Upcoming } from "./types";
 
@@ -69,7 +70,7 @@ export default function RideHud({ camera, gps, online, videoRef, upcoming, dista
               <div className="flex items-end justify-between gap-4">
                 <div>
                   <p className="text-sm text-muted">pothole ahead · reported by a rider before you</p>
-                  <p className="mt-1 text-2xl font-medium tracking-tight">{upcoming.lane}</p>
+                  <p className="mt-1 flex items-center gap-3 text-2xl font-medium tracking-tight"><SeverityBullet value={upcoming.severity} large />{upcoming.lane}</p>
                   <p className="text-sm text-muted">{SEV_WORD[upcoming.severity]} · severity {upcoming.severity} of 5 · {upcoming.street}</p>
                 </div>
                 <p className="text-right text-4xl font-medium tabular-nums tracking-tight">{distance}<span className="ml-1 text-base text-muted">ft</span></p>

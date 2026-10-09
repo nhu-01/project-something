@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { LANGS, type Lang } from "@/lib/voice";
 
 // Camera preview for the ride screen. Failure is non-fatal: the ride continues without video.
 export function useCamera(active: boolean) {
@@ -59,10 +60,11 @@ export function useSpeech() {
   const eleven = useRef(true); // flips off after the first failure, so we stop retrying mid-ride
   useEffect(() => { onRef.current = on; if (!on) { audio.current?.pause(); try { window.speechSynthesis?.cancel(); } catch { /* unsupported */ } } }, [on]);
 
-  const builtIn = useCallback((text: string) => {
+  const builtIn = useCallback((text: string, lang: Lang) => {
     try {
       window.speechSynthesis?.cancel();
       const u = new SpeechSynthesisUtterance(text);
+      u.lang = LANGS[lang].bcp47;
       u.rate = 1.02;
       window.speechSynthesis?.speak(u);
     } catch { /* unsupported */ }
@@ -74,11 +76,11 @@ export function useSpeech() {
     audio.current = primed(audio.current);
   }, []);
 
-  const say = useCallback((text: string) => {
+  const say = useCallback((text: string, lang: Lang) => {
     if (!onRef.current) return;
     const a = audio.current;
-    if (!a || !eleven.current) return builtIn(text);
-    playUrl(a, `/api/voice?text=${encodeURIComponent(text)}`, (permanent) => { if (permanent) eleven.current = false; builtIn(text); });
+    if (!a || !eleven.current) return builtIn(text, lang);
+    playUrl(a, `/api/voice?lang=${lang}&text=${encodeURIComponent(text)}`, (permanent) => { if (permanent) eleven.current = false; builtIn(text, lang); });
   }, [builtIn]);
 
   const stop = useCallback(() => {
