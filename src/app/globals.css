@@ -85,6 +85,20 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
 }
 @media (prefers-reduced-motion: reduce) { .logo-dot { animation: none; } }
 
+/* ---------- Motion ---------- */
+.ticker { overflow: hidden; mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent); }
+.ticker-track { animation: ticker 48s linear infinite; }
+.ticker:hover .ticker-track, .ticker:focus-within .ticker-track { animation-play-state: paused; }
+@keyframes ticker { to { transform: translateX(-50%); } }
+.pill svg { transition: transform 220ms var(--ease); }
+.pill:hover svg { transform: translate(2px, -2px); }
+@media (prefers-reduced-motion: reduce) {
+  .ticker { overflow-x: auto; mask-image: none; }
+  .ticker-track { animation: none; }
+  .pill svg { transition: none; }
+  .pill:hover svg { transform: none; }
+}
+
 /* ---------- Map ---------- */
 .map-shell .leaflet-container { background: var(--paper); font-family: var(--font-sans); height: 100%; width: 100%; }
 .map-shell .leaflet-tile-pane { filter: grayscale(1) contrast(0.85) brightness(1.08) sepia(0.06); }

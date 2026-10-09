@@ -1,4 +1,5 @@
 import Link from "next/link";
+import CountUp from "@/components/motion/CountUp";
 import Bars from "@/components/ui/Bars";
 import Reveal from "@/components/ui/Reveal";
 import { getPotholes, getStats } from "@/lib/data";
@@ -10,8 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function StatsPage() {
   const [stats, potholes] = await Promise.all([getStats(), getPotholes()]);
   const recentlyRepaired = potholes.filter((p) => p.status === "repaired").sort((a, b) => +new Date(b.lastSeen) - +new Date(a.lastSeen)).slice(0, 5);
-  const miles = stats.milesRidden < 10 ? stats.milesRidden.toFixed(1) : String(Math.round(stats.milesRidden));
-  const cards: [string, number | string][] = [["tracked", stats.tracked], ["open", stats.open], ["new this week", stats.newThisWeek], ["repaired this week", stats.repairedThisWeek], ["miles ridden", miles]];
+  const cards: [string, number, number][] = [["tracked", stats.tracked, 0], ["open", stats.open, 0], ["new this week", stats.newThisWeek, 0], ["repaired this week", stats.repairedThisWeek, 0], ["miles ridden", stats.milesRidden < 10 ? stats.milesRidden : Math.round(stats.milesRidden), stats.milesRidden < 10 ? 1 : 0]];
   return (
     <div className="wrap pt-10 sm:pt-16">
       <Reveal>
@@ -19,7 +19,7 @@ export default async function StatsPage() {
         <h1 className="h2 mt-2 max-w-[20ch]">how the city&apos;s roads are doing.</h1>
       </Reveal>
       <dl className="mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-3xl border border-line bg-line md:grid-cols-5">
-        {cards.map(([k, v], i) => (<Reveal key={k} delay={i * 0.05} className="bg-card p-6"><dd className="text-4xl font-medium tracking-tight">{v}</dd><dt className="mt-1 text-sm text-muted">{k}</dt></Reveal>))}
+        {cards.map(([k, v, d], i) => (<Reveal key={k} delay={i * 0.05} className="bg-card p-6"><dd className="text-4xl font-medium tracking-tight"><CountUp value={v} decimals={d} /></dd><dt className="mt-1 text-sm text-muted">{k}</dt></Reveal>))}
       </dl>
       <Reveal delay={0.05} className="card mt-6 p-6 sm:p-8"><h2 className="mb-4 text-lg font-medium">last 14 days</h2><Bars data={stats.daily} /></Reveal>
       <div className="mt-6 grid gap-6 md:grid-cols-2">
