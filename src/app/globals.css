@@ -1,0 +1,70 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+@import "leaflet.markercluster/dist/MarkerCluster.css";
+
+/* Design tokens (DESIGN.md). Never hard-code colors in components. */
+:root {
+  --paper: #fafaf7;
+  --ink: #20211e;
+  --muted: #696b63;
+  --line: #e4e3dc;
+  --sage: #d6dfcf;
+  --moss: #42644c;
+  --card: #ffffff;
+  --sev-1: #d9d0c1;
+  --sev-2: #cdae7e;
+  --sev-3: #c4833f;
+  --sev-4: #b4532b;
+  --sev-5: #8c2f1c;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-sage: var(--sage);
+  --color-moss: var(--moss);
+  --color-card: var(--card);
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --text-display: clamp(40px, 7vw, 84px);
+}
+
+html { background: var(--paper); scroll-behavior: smooth; }
+body { background: var(--paper); color: var(--ink); font-family: var(--font-sans); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--sage); }
+:focus-visible { outline: 2px solid var(--moss); outline-offset: 3px; border-radius: 9999px; }
+
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+@layer components {
+  .display { font-size: var(--text-display); font-weight: 500; letter-spacing: -0.03em; line-height: 1.02; }
+  .h2 { font-size: clamp(28px, 4vw, 44px); font-weight: 500; letter-spacing: -0.025em; line-height: 1.1; }
+  .eyebrow { font-size: 13px; letter-spacing: 0.02em; color: var(--muted); }
+  .wrap { margin-inline: auto; max-width: 1180px; padding-inline: 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 24px; }
+  .pill { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; border-radius: 9999px; padding: 0 22px; font-size: 15px; font-weight: 500; transition: transform 180ms var(--ease), background-color 180ms var(--ease), opacity 180ms; }
+  .pill:hover { transform: translateY(-2px); }
+  .pill-ink { background: var(--ink); color: var(--paper); }
+  .pill-ink:hover { opacity: 0.88; }
+  .pill-line { border: 1px solid var(--ink); color: var(--ink); background: transparent; }
+  .pill-line:hover { background: var(--ink); color: var(--paper); }
+  .chip { display: inline-flex; min-height: 36px; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 9999px; padding: 0 14px; font-size: 14px; background: var(--card); transition: background-color 160ms, border-color 160ms; }
+  .chip[aria-pressed="true"] { background: var(--sage); border-color: var(--moss); }
+}
+@media (min-width: 640px) { .wrap { padding-inline: 40px; } }
+
+/* ---------- Map ---------- */
+.map-shell .leaflet-container { background: var(--paper); font-family: var(--font-sans); height: 100%; width: 100%; }
+.map-shell .leaflet-tile-pane { filter: grayscale(1) contrast(0.85) brightness(1.08) sepia(0.06); }
+.map-shell .leaflet-control-zoom { border: 1px solid var(--line); border-radius: 9999px; overflow: hidden; background: var(--card); }
+.map-shell .leaflet-control-zoom a { width: 40px; height: 40px; line-height: 38px; color: var(--ink); background: var(--card); border: 0; }
+.map-shell .leaflet-control-attribution { font-size: 10px; background: color-mix(in srgb, var(--paper) 80%, transparent); }
+.pin-wrap, .cluster-wrap { background: none; border: 0; }
+.pin { position: relative; display: grid; width: 44px; height: 44px; place-items: center; border: 0; background: none; cursor: pointer; }
+.pin-dot { border-radius: 9999px; background: var(--pin-color); border: 2px solid var(--paper); box-shadow: 0 0 0 1px var(--ink), 0 4px 10px rgb(32 33 30 / 0.18); width: var(--pin-size); height: var(--pin-size); transition: transform 180ms var(--ease); }
+.pin:hover .pin-dot { transform: scale(1.18); }
+.pin--selected .pin-dot { box-shadow: 0 0 0 2px var(--ink), 0 0 0 7px color-mix(in srgb, var(--sage) 85%, transparent); transform: scale(1.15); }
+.pin--repaired .pin-dot { background: var(--paper); box-shadow: 0 0 0 1.5px var(--moss); border-color: var(--moss); }
+.cluster { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 9999px; background: var(--ink); color: var(--paper); font-size: 14px; font-weight: 500; box-shadow: 0 0 0 5px color-mix(in srgb, var(--ink) 14%, transparent); }
