@@ -4,11 +4,12 @@ import { z } from "zod";
 
 export const Verdict = z.object({
   pothole_present: z.boolean(),
+  hazard_type: z.enum(["pothole", "bump", "rough", "none"]),
   repair_patch_visible: z.boolean(),
   severity: z.number().int().min(1).max(5).nullable(),
   size: z.enum(["small", "medium", "large"]).nullable(),
-  lane: z.enum(["right lane", "right lane, near curb", "center lane", "left lane", "bike lane", "crosswalk", "intersection", "unknown lane"]),
-  road_type: z.enum(["street", "highway_or_ramp", "bridge_or_tunnel", "not_a_road"]),
+  lane: z.enum(["right lane", "right lane, near curb", "center lane", "left lane", "bike lane", "crosswalk", "intersection", "sidewalk", "unknown lane"]),
+  road_type: z.enum(["street", "sidewalk_or_path", "highway_or_ramp", "bridge_or_tunnel", "not_a_road"]),
   people_or_plates: z.boolean(),
   screen_or_print: z.boolean(),
   confidence: z.enum(["low", "medium", "high"]),
@@ -16,22 +17,28 @@ export const Verdict = z.object({
 });
 export type Verdict = z.infer<typeof Verdict>;
 
-const RUBRIC = `You check one frame from a bike/scooter/dash-mounted phone camera in New York City for potholes.
+const RUBRIC = `You check one frame from a bike/scooter/dash-mounted or handheld phone camera in New York City for road surface
+hazards: anything in the pavement that could jolt or throw a bike, scooter or wheelchair.
 Return ONLY a JSON object with exactly these keys:
-pothole_present (bool), repair_patch_visible (bool: a fresh asphalt patch where a pothole would be),
-severity (int 1-5, or null if no pothole), size (small | medium | large | null),
-lane (right lane | right lane, near curb | center lane | left lane | bike lane | crosswalk | intersection | unknown lane),
-road_type (street | highway_or_ramp | bridge_or_tunnel | not_a_road),
+pothole_present (bool: true when ANY such hazard is visible, not only a classic pothole),
+hazard_type (pothole = a hole or missing chunk of the surface, including a missing or sunken brick or paver | bump = a raised or sunken spot such as a heave, ridge,
+  sunken or raised utility cover, or a lip between slabs | rough = cracked, broken, crumbling or badly uneven pavement |
+  none), repair_patch_visible (bool: a fresh asphalt patch where a pothole would be),
+severity (int 1-5, or null if no hazard), size (small | medium | large | null),
+lane (right lane | right lane, near curb | center lane | left lane | bike lane | crosswalk | intersection | sidewalk | unknown lane),
+road_type (street | sidewalk_or_path = sidewalks, plazas, greenways, bike or foot paths, including brick and paver
+  surfaces | highway_or_ramp | bridge_or_tunnel | not_a_road = indoors, grass, or no walkable/rideable surface),
 people_or_plates (bool: identifiable faces or readable license plates in frame),
 screen_or_print (bool: the camera is pointed at a picture rather than a real road: a phone, laptop, TV or monitor screen,
   a printed photo or poster. Clues: bezels or window chrome, pixel grid or moire, screen glare, a flat rectangle with the
   road inside it, UI elements, paper edges),
 confidence (low | medium | high), note (one short lowercase sentence about what you see).
 
-Severity: 1 shallow dip or surface crack. 2 small shallow hole under ~15 cm. 3 clear hole 15-30 cm, a real jolt.
-4 deep or wide hole 30-60 cm, likely wheel damage, riders swerve. 5 very large or deep, serious hazard to bikes and scooters.
-Be conservative: shadows, manhole covers, drains, puddles, stains and painted markings are NOT potholes.
-If unsure, pothole_present=false with confidence "low".
+Severity (how hard it would hit a bike or scooter): 1 hairline cracks or a shallow dip. 2 small shallow hole or low bump,
+under ~15 cm. 3 clear hole, ridge or broken patch 15-30 cm, a real jolt. 4 deep or wide, 30-60 cm, likely wheel damage,
+riders swerve. 5 very large or deep, a serious hazard.
+Not hazards: shadows, puddles, stains, painted markings, and flush, level manhole covers or drains.
+If the surface looks smooth and rideable, pothole_present=false and hazard_type="none". If unsure, say false with confidence "low".
 Still judge pothole_present for what the picture shows, even when screen_or_print is true.`;
 
 export async function judgeFrame(frame: Buffer): Promise<Verdict> {

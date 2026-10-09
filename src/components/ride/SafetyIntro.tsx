@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import { ArrowUpRight } from "@/components/ui/Icons";
+import { ArrowUpRight, Volume } from "@/components/ui/Icons";
+import Destination from "./Destination";
 import { LANG_CODES, LANGS, type Lang } from "@/lib/voice";
 
 const CHECKS = [
@@ -9,7 +10,9 @@ const CHECKS = [
   "I'm riding legally and keeping my eyes on the road",
 ];
 
-export default function SafetyIntro({ onStart, lang, onLang }: { onStart: () => void; lang: Lang; onLang: (l: Lang) => void }) {
+type Props = { onStart: () => void; lang: Lang; onLang: (l: Lang) => void; onHearGuide: () => void; onRoute: (count: number | null) => void };
+
+export default function SafetyIntro({ onStart, lang, onLang, onHearGuide, onRoute }: Props) {
   const [checked, setChecked] = useState<boolean[]>(CHECKS.map(() => false));
   const ready = checked.every(Boolean);
   return (
@@ -17,7 +20,8 @@ export default function SafetyIntro({ onStart, lang, onLang }: { onStart: () => 
       <div className="mx-auto w-full max-w-lg">
         <p className="eyebrow">before you ride</p>
         <h1 className="h2 mt-2">set up, then go.</h1>
-        <p className="mt-3 text-muted">spotholes watches the road and speaks warnings so you don&apos;t have to look at the screen. it only works safely if the phone is mounted first.</p>
+        <p className="mt-3 text-muted">spotholes watches the ground and speaks warnings about potholes, bumps and rough pavement, so you don&apos;t have to look at the screen. it only works safely if the phone is mounted first.</p>
+        <button type="button" onClick={onHearGuide} className="chip mt-4"><Volume />hear how it works</button>
         <ul className="mt-8 space-y-3">
           {CHECKS.map((c, i) => (
             <li key={c}>
@@ -36,6 +40,7 @@ export default function SafetyIntro({ onStart, lang, onLang }: { onStart: () => 
             ))}
           </div>
         </fieldset>
+        <Destination onRoute={onRoute} />
         <button onClick={onStart} disabled={!ready} className="pill pill-ink mt-8 w-full disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0">
           start ride <ArrowUpRight />
         </button>

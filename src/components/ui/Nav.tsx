@@ -6,7 +6,7 @@ export default function Nav() {
       <nav className="wrap flex h-16 items-center justify-between" aria-label="Main">
         <Link href="/" className="flex items-center gap-2 text-[17px] font-medium tracking-tight">
           <span className="grid h-6 w-6 place-items-center rounded-full border border-ink" aria-hidden>
-            <span className="h-2.5 w-2.5 rounded-full bg-line-red" />
+            <span className="logo-dot h-2.5 w-2.5 rounded-full" />
           </span>
           spotholes
         </Link>

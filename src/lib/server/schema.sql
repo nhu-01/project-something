@@ -51,3 +51,9 @@ CREATE TABLE IF NOT EXISTS ride_points (
   lng      DOUBLE PRECISION NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ride_points_ride ON ride_points (ride_id, at);
+
+-- What kind of hazard it is (pothole | bump | rough), and per-ride diagnostics for tuning the detector.
+ALTER TABLE potholes ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'pothole';
+ALTER TABLE rides ADD COLUMN IF NOT EXISTS max_yolo REAL NOT NULL DEFAULT 0;
+ALTER TABLE rides ADD COLUMN IF NOT EXISTS gemini_calls INT NOT NULL DEFAULT 0;
+ALTER TABLE rides ADD COLUMN IF NOT EXISTS last_look TIMESTAMPTZ;

@@ -21,6 +21,7 @@ export type Pothole = {
   direction: string;
   lane: string;
   size: "small" | "medium" | "large";
+  kind: "pothole" | "bump" | "rough";
   severity: Severity | null; // null once repaired
   status: Status;
   firstSeen: string;

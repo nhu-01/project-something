@@ -6,7 +6,7 @@ import type { Pothole, Severity, Sighting, SightingKind, Stats, Status, Track } 
 // The only place pages read potholes from. Everything here is real rider data from the database.
 type PRow = {
   id: number; lat: number; lng: number; street: string; borough: string; direction: string; lane: string; size: string;
-  severity: number | null; status: string; first_seen: string | Date; last_seen: string | Date; photo: string | null;
+  severity: number | null; status: string; kind: string | null; first_seen: string | Date; last_seen: string | Date; photo: string | null;
 };
 type SRow = { id: string | number; pothole_id: number; at: string | Date; rider: string; kind: string; severity: number | null; note: string };
 
@@ -17,6 +17,7 @@ function shape(p: PRow, sightings: SRow[]): Pothole {
   return {
     id: String(p.id), lat: p.lat, lng: p.lng, street: p.street, borough: p.borough, direction: p.direction, lane: p.lane,
     size: (["small", "medium", "large"].includes(p.size) ? p.size : "medium") as Pothole["size"],
+    kind: (p.kind === "bump" || p.kind === "rough" ? p.kind : "pothole") as Pothole["kind"],
     severity: sev(p.severity), status: (p.status === "repaired" ? "repaired" : "open") as Status,
     firstSeen: iso(p.first_seen), lastSeen: iso(p.last_seen), seed: p.id * 7919, photo: p.photo ?? undefined,
     sightings: sightings.map((s): Sighting => ({ id: String(s.id), at: iso(s.at), rider: s.rider, kind: s.kind as SightingKind, severity: sev(s.severity), note: s.note })),
@@ -39,7 +40,9 @@ export async function getPothole(id: string): Promise<Pothole | null> {
   return shape(p, await query<SRow>("SELECT id, pothole_id, at, rider, kind, severity, note FROM sightings WHERE pothole_id=$1 ORDER BY at ASC", [id]));
 }
 
-const PRIVACY_TRIM_M = 150; // hide the start and end of every ride, so tracks don't point at anyone's home
+// Hide the start and end of every ride, so tracks don't point at anyone's home: 12% of the ride at each end,
+// at least 25 m and at most 150 m.
+const trimFor = (lengthM: number) => Math.min(150, Math.max(25, lengthM * 0.12));
 const GAP_M = 120; // a jump this big between breadcrumbs is a GPS glitch or a pause, not a ridden street
 
 // Where the app has been ridden in the last `days` days, as anonymous line segments.
@@ -55,7 +58,9 @@ export async function getTracks(days = 30): Promise<Track[]> {
   for (const pts of byRide.values()) {
     if (pts.length < 2) continue;
     const first = pts[0], last = pts[pts.length - 1];
-    const kept = pts.filter((p) => meters(p[0], p[1], first[0], first[1]) > PRIVACY_TRIM_M && meters(p[0], p[1], last[0], last[1]) > PRIVACY_TRIM_M);
+    const length = pts.slice(1).reduce((d, p, i) => d + meters(pts[i][0], pts[i][1], p[0], p[1]), 0);
+    const trim = trimFor(length);
+    const kept = pts.filter((p) => meters(p[0], p[1], first[0], first[1]) > trim && meters(p[0], p[1], last[0], last[1]) > trim);
     let seg: Track = [];
     for (const p of kept) {
       const prev = seg[seg.length - 1];

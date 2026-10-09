@@ -9,6 +9,8 @@ export const SEV_DARK_TEXT: Record<Severity, boolean> = { 1: true, 2: true, 3: f
 
 export const SEV_WORD: Record<Severity, string> = { 1: "minor", 2: "light", 3: "moderate", 4: "serious", 5: "severe" };
 
+export const HAZARD_LABEL = { pothole: "pothole", bump: "bump", rough: "rough road" } as const;
+
 export const KIND_LABEL: Record<SightingKind, string> = {
   first_seen: "first seen", confirmed: "confirmed", worse: "got worse", better: "looks better", not_found: "not found", repaired: "repaired",
 };

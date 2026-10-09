@@ -1,14 +1,15 @@
 "use client";
 import { useEffect, useRef, useState, type RefObject } from "react";
-import type { GpsState, RideEvent, Sev, Upcoming } from "./types";
+import type { GpsState, Hazard, RideEvent, Sev, Upcoming } from "./types";
 
-type Known = { id: string; lat: number; lng: number; street: string; lane: string; severity: number };
+type Known = { id: string; lat: number; lng: number; street: string; lane: string; severity: number; kind?: string };
 type Pos = { lat: number; lng: number; heading: number | null; accuracy: number | null };
-type ServerEvent = { kind: RideEvent["kind"]; potholeId: string; street: string; lane: string; severity: number | null };
+type ServerEvent = { kind: RideEvent["kind"]; potholeId: string; hazard?: string; street: string; lane: string; severity: number | null };
+const toHazard = (s?: string): Hazard => (s === "bump" || s === "rough" ? s : "pothole");
 
 const WARN_M = 55; // start warning about a known pothole this far out (~180 ft)
 const PASS_M = 20; // closer than this counts as having reached it
-const FRAME_MS = 1200;
+const FRAME_MS = 700; // pause between frames; each frame also waits for the server's answer
 const FT = 3.28084;
 
 const rad = (d: number) => (d * Math.PI) / 180;
@@ -42,7 +43,7 @@ function grabFrame(video: HTMLVideoElement, canvas: HTMLCanvasElement): Promise<
   const s = Math.min(640 / vw, 640 / vh), w = vw * s, h = vh * s;
   ctx.fillStyle = "#727272"; ctx.fillRect(0, 0, 640, 640);
   ctx.drawImage(video, (640 - w) / 2, (640 - h) / 2, w, h);
-  return new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.72));
+  return new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.6));
 }
 
 type Opts = {
@@ -61,6 +62,7 @@ export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onH
   const [distance, setDistance] = useState(0);
   const [gps, setGps] = useState<GpsState>("waiting");
   const [online, setOnline] = useState(true);
+  const [meters_, setMeters] = useState(0); // distance covered this ride, from the GPS breadcrumbs
   const live = useRef({ paused, onAhead, onResult, onHint });
   useEffect(() => { live.current = { paused, onAhead, onResult, onHint }; }, [paused, onAhead, onResult, onHint]);
 
@@ -85,7 +87,7 @@ export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onH
       if (!e || stopped) return;
       resolved.add(e.potholeId); warned.add(e.potholeId);
       if (e.kind === "repaired") known.delete(e.potholeId);
-      live.current.onResult({ id: `${e.potholeId}-${e.kind}`, kind: e.kind, street: e.street, lane: e.lane, severity: toSev(e.severity), at: Date.now() });
+      live.current.onResult({ id: `${e.potholeId}-${e.kind}`, kind: e.kind, hazard: toHazard(e.hazard), street: e.street, lane: e.lane, severity: toSev(e.severity), at: Date.now() });
     };
 
     const send = async (path: "/api/scan" | "/api/pass", frame: Blob, extra: Record<string, string> = {}) => {
@@ -131,7 +133,10 @@ export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onH
         if (!prevFix) prevFix = here;
         pos = { ...here, heading, accuracy: p.coords.accuracy ?? null };
         // breadcrumb for the ridden-streets map: only decent fixes, only when we've actually moved
-        if ((p.coords.accuracy ?? 99) <= 35 && (!lastCrumb || meters(lastCrumb, here) > 8)) { lastCrumb = here; crumbs.push({ ...here, t: Date.now() }); }
+        if ((p.coords.accuracy ?? 99) <= 50 && (!lastCrumb || meters(lastCrumb, here) > 6)) {
+          if (lastCrumb) { const step = meters(lastCrumb, here); if (step < 120) setMeters((m) => m + step); }
+          lastCrumb = here; crumbs.push({ ...here, t: Date.now() });
+        }
         setGps("ok");
       },
       (err) => { if (err.code === err.PERMISSION_DENIED) setGps("denied"); },
@@ -176,7 +181,7 @@ export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onH
       if (best) {
         warned.add(best.k.id);
         current = { id: best.k.id, minD: best.d };
-        const u: Upcoming = { id: best.k.id, street: best.k.street, lane: best.k.lane, severity: toSev(best.k.severity) ?? 2, startFt: Math.max(10, Math.round(best.d * FT)) };
+        const u: Upcoming = { id: best.k.id, hazard: toHazard(best.k.kind), street: best.k.street, lane: best.k.lane, severity: toSev(best.k.severity) ?? 2, startFt: Math.max(10, Math.round(best.d * FT)) };
         setUpcoming(u); setDistance(u.startFt); live.current.onAhead(u);
       }
     }, 400);
@@ -199,10 +204,10 @@ export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onH
       clearInterval(crumbTimer);
       flushCrumbs(true);
       if (watch != null) navigator.geolocation.clearWatch(watch);
-      setUpcoming(null); setGps("waiting");
+      setUpcoming(null); setGps("waiting"); setMeters(0);
       if (ride) void fetch(`/api/rides/${ride.rideId}/end`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: ride.token }), keepalive: true }).catch(() => {});
     };
   }, [active, videoRef]);
 
-  return { upcoming, distance, gps, online };
+  return { upcoming, distance, gps, online, meters: meters_ };
 }

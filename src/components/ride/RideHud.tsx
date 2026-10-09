@@ -3,11 +3,11 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
 import { Pause, Volume } from "@/components/ui/Icons";
 import { SeverityBullet } from "@/components/ui/Bullet";
-import { SEV_WORD } from "@/lib/tokens";
+import { HAZARD_LABEL, SEV_WORD } from "@/lib/tokens";
 import type { GpsState, RideEvent, Upcoming } from "./types";
 
 const RESULT_COPY: Record<RideEvent["kind"], string> = {
-  new: "new pothole logged", confirmed: "confirmed. same as the last rider saw", worse: "it's gotten worse. updated", better: "it looks better. updated", repaired: "looks repaired. thanks",
+  new: "new hazard logged", confirmed: "confirmed. same as the last rider saw", worse: "it's gotten worse. updated", better: "it looks better. updated", repaired: "looks repaired. thanks",
 };
 
 function useElapsed(running: boolean) {
@@ -57,7 +57,7 @@ export default function RideHud({ camera, gps, online, videoRef, upcoming, dista
           <span className="text-muted" aria-label={`elapsed ${mm} minutes ${ss} seconds`}>{mm}:{ss}</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="rounded-full bg-paper/90 px-4 py-2 text-sm text-ink backdrop-blur">{count} found</div>
+          <div className="rounded-full bg-paper/90 px-4 py-2 text-sm text-ink backdrop-blur">{count} logged</div>
           <button onClick={onToggleVoice} aria-pressed={voiceOn} aria-label={voiceOn ? "mute voice" : "unmute voice"} className={`grid h-11 w-11 place-items-center rounded-full backdrop-blur ${voiceOn ? "bg-paper/90 text-ink" : "bg-paper/30 text-paper"}`}><Volume /></button>
         </div>
       </div>
@@ -69,7 +69,7 @@ export default function RideHud({ camera, gps, online, videoRef, upcoming, dista
             <motion.div key={upcoming.id} {...rise} role="status" aria-live="assertive" className="w-full max-w-md rounded-[28px] bg-paper p-5 text-ink shadow-[0_18px_50px_rgb(0_0_0/0.35)]">
               <div className="flex items-end justify-between gap-4">
                 <div>
-                  <p className="text-sm text-muted">pothole ahead · reported by a rider before you</p>
+                  <p className="text-sm text-muted">{HAZARD_LABEL[upcoming.hazard]} ahead · reported by a rider before you</p>
                   <p className="mt-1 flex items-center gap-3 text-2xl font-medium tracking-tight"><SeverityBullet value={upcoming.severity} large />{upcoming.lane}</p>
                   <p className="text-sm text-muted">{SEV_WORD[upcoming.severity]} · severity {upcoming.severity} of 5 · {upcoming.street}</p>
                 </div>

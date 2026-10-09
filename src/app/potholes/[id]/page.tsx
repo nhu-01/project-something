@@ -6,6 +6,7 @@ import Reveal from "@/components/ui/Reveal";
 import { SeverityMeter, StatusChip } from "@/components/ui/Severity";
 import { getPothole } from "@/lib/data";
 import { ago, cap, daysAgo } from "@/lib/format";
+import { HAZARD_LABEL } from "@/lib/tokens";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,7 +19,7 @@ export default async function PotholePage({ params }: { params: Promise<{ id: st
   const p = await getPothole(id);
   if (!p) notFound();
   const facts: [string, string][] = [
-    ["street", `${p.street}, ${p.borough}`], ["direction", p.direction], ["position in road", p.lane], ["size (estimate)", cap(p.size)],
+    ["type", HAZARD_LABEL[p.kind]], ["street", `${p.street}, ${p.borough}`], ["direction", p.direction], ["position in road", p.lane], ["size (estimate)", cap(p.size)],
     ["first seen", ago(p.firstSeen)], ["last seen", ago(p.lastSeen)], ["rider passes", String(p.sightings.length)], ["open for", p.status === "repaired" ? "no longer open" : `${daysAgo(p.firstSeen)} days`],
   ];
   return (

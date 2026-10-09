@@ -7,5 +7,5 @@ export async function GET(req: Request) {
   const lat = Number(u.searchParams.get("lat")), lng = Number(u.searchParams.get("lng"));
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return bad("lat and lng required");
   const rows = await nearbyOpen(lat, lng, 600);
-  return Response.json(rows.map((p) => ({ id: String(p.id), lat: p.lat, lng: p.lng, street: p.street, lane: p.lane, severity: p.severity ?? 2 })), { headers: { "cache-control": "no-store" } });
+  return Response.json(rows.map((p) => ({ id: String(p.id), lat: p.lat, lng: p.lng, street: p.street, lane: p.lane, severity: p.severity ?? 2, kind: p.kind })), { headers: { "cache-control": "no-store" } });
 }

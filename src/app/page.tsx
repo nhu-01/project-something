@@ -19,7 +19,7 @@ export default async function Home() {
           <Reveal><p className="eyebrow">a pothole copilot for new york</p></Reveal>
           <Reveal delay={0.05}><h1 className="display mt-4">ride. the city<br />remembers.</h1></Reveal>
           <Reveal delay={0.12}>
-            <p className="mx-auto mt-6 max-w-xl text-lg text-muted">spotholes listens for potholes as you ride, warns the next rider, and keeps a living map of nyc&apos;s roads.</p>
+            <p className="mx-auto mt-6 max-w-xl text-lg text-muted">spotholes watches for potholes, bumps and rough pavement as you ride or walk, warns the next person, and keeps a living map of nyc&apos;s streets.</p>
           </Reveal>
           <Reveal delay={0.18}>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">

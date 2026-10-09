@@ -75,6 +75,16 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
 }
 @media (min-width: 640px) { .wrap { padding-inline: 40px; } }
 
+/* The wordmark's dot rides through the subway line colors. Static red under reduced motion. */
+.logo-dot { background: var(--line-red); animation: line-cycle 33s linear infinite; }
+@keyframes line-cycle {
+  0%, 7% { background: var(--line-red); } 9%, 16% { background: var(--line-orange); } 18%, 25% { background: var(--line-yellow); }
+  27%, 34% { background: var(--line-lime); } 36%, 43% { background: var(--line-green); } 45%, 52% { background: var(--line-teal); }
+  54%, 61% { background: var(--line-blue); } 63%, 70% { background: var(--line-purple); } 72%, 79% { background: var(--line-brown); }
+  81%, 88% { background: var(--line-slate); } 90%, 97% { background: var(--line-gray); } 100% { background: var(--line-red); }
+}
+@media (prefers-reduced-motion: reduce) { .logo-dot { animation: none; } }
+
 /* ---------- Map ---------- */
 .map-shell .leaflet-container { background: var(--paper); font-family: var(--font-sans); height: 100%; width: 100%; }
 .map-shell .leaflet-tile-pane { filter: grayscale(1) contrast(0.85) brightness(1.08) sepia(0.06); }

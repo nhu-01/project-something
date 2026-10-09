@@ -6,7 +6,7 @@ import Recap from "./Recap";
 import RideHud from "./RideHud";
 import SafetyIntro from "./SafetyIntro";
 import type { Phase, RideEvent, Upcoming } from "./types";
-import { aheadPhrase, preferredLang, resultPhrase, screenPhrase, type Lang } from "@/lib/voice";
+import { aheadPhrase, briefPhrase, cuePhrase, preferredLang, resultPhrase, screenPhrase, type Lang } from "@/lib/voice";
 
 const noSubscribe = () => () => {};
 
@@ -22,16 +22,18 @@ export default function RideScreen() {
   const lang = chosen ?? detected;
   const setLang = (l: Lang) => { setChosen(l); try { localStorage.setItem("spotholes-lang", l); } catch { /* storage blocked */ } };
   const [paused, setPaused] = useState(false);
+  const [onTheWay, setOnTheWay] = useState<number | null>(null); // known hazards toward the chosen destination
   const startedAt = useRef(0);
-  const [seconds, setSeconds] = useState(0);
+  const [summary, setSummary] = useState({ seconds: 0, meters: 0 });
   const speech = useSpeech();
   const riding = phase === "riding";
 
   const camera = useCamera(phase === "starting" || riding);
   useWakeLock(riding);
 
+  // Warnings cut in front of anything else that's being said.
   const onAhead = useCallback((u: Upcoming) => {
-    speech.say(aheadPhrase(lang, u.lane, u.severity), lang);
+    speech.say(aheadPhrase(lang, u.hazard, u.lane, u.severity), lang, true);
   }, [speech, lang]);
   const onResult = useCallback((e: RideEvent) => {
     setEvents((cur) => [...cur, e]);
@@ -39,12 +41,11 @@ export default function RideScreen() {
     setNotice(null);
     speech.say(resultPhrase(lang, e.kind), lang);
   }, [speech, lang]);
-  const onHint = useCallback((hint: "screen") => {
+  const onHint = useCallback(() => {
     setNotice("that looks like a picture, not the road. nothing was logged.");
-    void hint;
     speech.say(screenPhrase(lang), lang);
   }, [speech, lang]);
-  const { upcoming, distance, gps, online } = useRideEngine({ active: riding, paused, videoRef: camera.ref, onAhead, onResult, onHint });
+  const { upcoming, distance, gps, online, meters } = useRideEngine({ active: riding, paused, videoRef: camera.ref, onAhead, onResult, onHint });
 
   // brief "starting" step so permission prompts happen after the tap
   useEffect(() => {
@@ -53,18 +54,33 @@ export default function RideScreen() {
     return () => clearTimeout(t);
   }, [phase]);
 
+  // Say so the first time GPS locks on, so the rider knows it's working without looking.
+  const gpsSaid = useRef(false);
+  useEffect(() => {
+    if (!riding) { gpsSaid.current = false; return; }
+    if (gps === "ok" && !gpsSaid.current) { gpsSaid.current = true; speech.say(cuePhrase(lang, "gps"), lang); }
+  }, [riding, gps, speech, lang]);
+
   useEffect(() => { if (!last) return; const t = setTimeout(() => setLast(null), 4500); return () => clearTimeout(t); }, [last]);
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(null), 5000); return () => clearTimeout(t); }, [notice]);
 
-  const start = () => { speech.unlock(); setEvents([]); setLast(null); setNotice(null); setPaused(false); setPhase("starting"); };
+  const start = () => {
+    speech.unlock();
+    setEvents([]); setLast(null); setNotice(null); setPaused(false); setPhase("starting");
+    // spoken right away, inside the tap: confirms audio works and tells the rider what happens next
+    speech.say(cuePhrase(lang, "start"), lang);
+    if (onTheWay != null) speech.say(briefPhrase(lang, onTheWay), lang);
+  };
   const end = () => {
     speech.stop();
-    setSeconds(Math.round((Date.now() - startedAt.current) / 1000));
+    speech.say(cuePhrase(lang, "done"), lang);
+    setSummary({ seconds: Math.round((Date.now() - startedAt.current) / 1000), meters });
     setPhase("recap");
   };
+  const hearGuide = () => { speech.unlock(); speech.say(cuePhrase(lang, "guide"), lang, true); };
 
-  if (phase === "recap") return <Recap events={events} seconds={seconds} onAgain={() => setPhase("intro")} />;
-  if (phase === "intro") return <SafetyIntro onStart={start} lang={lang} onLang={setLang} />;
+  if (phase === "recap") return <Recap events={events} seconds={summary.seconds} meters={summary.meters} onAgain={() => setPhase("intro")} />;
+  if (phase === "intro") return <SafetyIntro onStart={start} lang={lang} onLang={setLang} onHearGuide={hearGuide} onRoute={setOnTheWay} />;
   return (
     <RideHud
       camera={camera.state} gps={gps} online={online} videoRef={camera.ref} upcoming={upcoming} distance={distance} last={last} notice={notice} paused={paused}

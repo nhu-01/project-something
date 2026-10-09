@@ -8,6 +8,7 @@ import { Close, ArrowUpRight } from "@/components/ui/Icons";
 import { SeverityMeter, StatusChip } from "@/components/ui/Severity";
 import type { Pothole } from "@/lib/data/types";
 import { ago, cap } from "@/lib/format";
+import { HAZARD_LABEL } from "@/lib/tokens";
 
 // Floating card on desktop, bottom sheet on phones. Esc closes; focus moves in on open.
 export default function DetailSheet({ pothole, onClose }: { pothole: Pothole | null; onClose: () => void }) {
@@ -37,6 +38,7 @@ export default function DetailSheet({ pothole, onClose }: { pothole: Pothole | n
           <div className="flex-1 space-y-4 overflow-y-auto p-5" data-lenis-prevent>
             <div>
               <h2 className="text-xl font-medium tracking-tight">{pothole.street}</h2>
+              <p className="text-sm">{HAZARD_LABEL[pothole.kind]}</p>
               <p className="text-sm text-muted">{pothole.borough} · {pothole.direction} · {pothole.lane}</p>
             </div>
             <div className="flex flex-wrap items-center gap-3"><StatusChip status={pothole.status} /><span className="text-sm text-muted">last seen {ago(pothole.lastSeen)}</span></div>

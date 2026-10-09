@@ -44,49 +44,79 @@ function primed(existing: HTMLAudioElement | null) {
   return a;
 }
 
-// onFail(permanent): the endpoint answered with something that isn't audio (e.g. voice not configured).
-function playUrl(a: HTMLAudioElement, url: string, onFail: (permanent: boolean) => void) {
+// Plays one clip. onEnd fires when it finishes; onFail(permanent) when it can't play (permanent = the endpoint
+// answered with something that isn't audio, e.g. voice not configured).
+function playUrl(a: HTMLAudioElement, url: string, onEnd: () => void, onFail: (permanent: boolean) => void) {
+  a.onended = onEnd;
   a.onerror = () => onFail(true);
   a.src = url;
-  // AbortError just means a newer phrase replaced this one
-  void a.play().catch((e: unknown) => { if ((e as Error)?.name !== "AbortError" && (e as Error)?.name !== "NotSupportedError") onFail(false); });
+  // AbortError just means a newer phrase replaced this one; NotSupportedError is reported through onerror
+  void a.play().catch((e: unknown) => { const n = (e as Error)?.name; if (n !== "AbortError" && n !== "NotSupportedError") onFail(false); });
+}
+function silence(a: HTMLAudioElement | null) {
+  if (a) { a.onended = null; a.onerror = null; a.pause(); }
+  try { window.speechSynthesis?.cancel(); } catch { /* unsupported */ }
 }
 
+type Line = { text: string; lang: Lang };
+
 // Voice for the ride. ElevenLabs (via /api/voice) when it is configured, the phone's built-in voice otherwise.
+// Lines queue up and play in order; a priority line (a warning) cuts in front of everything.
 export function useSpeech() {
   const [on, setOn] = useState(true);
   const onRef = useRef(on);
   const audio = useRef<HTMLAudioElement | null>(null);
   const eleven = useRef(true); // flips off after the first failure, so we stop retrying mid-ride
-  useEffect(() => { onRef.current = on; if (!on) { audio.current?.pause(); try { window.speechSynthesis?.cancel(); } catch { /* unsupported */ } } }, [on]);
+  const queue = useRef<Line[]>([]);
+  const busy = useRef(false);
+  const turn = useRef(0); // invalidates callbacks from a line that was cut off
+  const next = useRef<() => void>(() => {}); // lets a finished line start the following one
 
-  const builtIn = useCallback((text: string, lang: Lang) => {
-    try {
-      window.speechSynthesis?.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = LANGS[lang].bcp47;
-      u.rate = 1.02;
-      window.speechSynthesis?.speak(u);
-    } catch { /* unsupported */ }
+  const pump = useCallback(() => {
+    if (busy.current || !onRef.current) return;
+    const line = queue.current.shift();
+    if (!line) return;
+    busy.current = true;
+    const mine = ++turn.current;
+    let finished = false;
+    const done = () => { if (finished || mine !== turn.current) return; finished = true; busy.current = false; next.current(); };
+    const guard = setTimeout(done, 12000); // never let one stuck clip block the queue
+    const finish = () => { clearTimeout(guard); done(); };
+    const builtIn = () => {
+      try {
+        const u = new SpeechSynthesisUtterance(line.text);
+        u.lang = LANGS[line.lang].bcp47;
+        u.rate = 1.02;
+        u.onend = finish; u.onerror = finish;
+        window.speechSynthesis?.speak(u);
+      } catch { finish(); }
+    };
+    const a = audio.current;
+    if (!a || !eleven.current) return builtIn();
+    playUrl(a, `/api/voice?lang=${line.lang}&text=${encodeURIComponent(line.text)}`, finish, (permanent) => { if (permanent) eleven.current = false; builtIn(); });
   }, []);
 
-  // Call from the Start tap.
+  useEffect(() => { next.current = pump; }, [pump]);
+
+  useEffect(() => {
+    onRef.current = on;
+    if (!on) { queue.current = []; turn.current++; busy.current = false; silence(audio.current); }
+  }, [on]);
+
+  // Call from a tap (Start, or "hear how it works"): iOS only allows audio that begins with a user gesture.
   const unlock = useCallback(() => {
     try { window.speechSynthesis?.speak(new SpeechSynthesisUtterance("")); } catch { /* unsupported */ }
     audio.current = primed(audio.current);
   }, []);
 
-  const say = useCallback((text: string, lang: Lang) => {
+  const say = useCallback((text: string, lang: Lang, priority = false) => {
     if (!onRef.current) return;
-    const a = audio.current;
-    if (!a || !eleven.current) return builtIn(text, lang);
-    playUrl(a, `/api/voice?lang=${lang}&text=${encodeURIComponent(text)}`, (permanent) => { if (permanent) eleven.current = false; builtIn(text, lang); });
-  }, [builtIn]);
+    if (priority) { queue.current = []; turn.current++; busy.current = false; silence(audio.current); }
+    queue.current.push({ text, lang });
+    pump();
+  }, [pump]);
 
-  const stop = useCallback(() => {
-    audio.current?.pause();
-    try { window.speechSynthesis?.cancel(); } catch { /* unsupported */ }
-  }, []);
+  const stop = useCallback(() => { queue.current = []; turn.current++; busy.current = false; silence(audio.current); }, []);
 
   return { on, setOn, say, unlock, stop };
 }
