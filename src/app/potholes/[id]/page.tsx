@@ -27,7 +27,7 @@ export default async function PotholePage({ params }: { params: Promise<{ id: st
       <div className="mt-6 grid gap-8 md:grid-cols-[1.1fr_1fr]">
         <Reveal><div className="card overflow-hidden"><FrameArt pothole={p} className="aspect-[5/3] w-full object-cover" /></div></Reveal>
         <Reveal delay={0.08} className="space-y-5">
-          <div className="flex flex-wrap items-center gap-3"><StatusChip status={p.status} /><span className="text-sm text-muted">sample data</span></div>
+          <div className="flex flex-wrap items-center gap-3"><StatusChip status={p.status} /></div>
           <h1 className="h2">{p.street}</h1>
           <SeverityMeter value={p.severity} />
           <dl className="card divide-y divide-line text-[15px]">

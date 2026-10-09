@@ -1,6 +1,5 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { RideEvent, RideEventKind, Upcoming } from "./types";
 
 // Camera preview for the ride screen. Failure is non-fatal: the ride continues without video.
 export function useCamera(active: boolean) {
@@ -49,45 +48,4 @@ export function useSpeech() {
     } catch { /* unsupported */ }
   }, []);
   return { on, setOn, say, unlock };
-}
-
-const STREETS = ["Bedford Ave", "Bedford Ave", "Nostrand Ave", "Flushing Ave"];
-const LANES = ["right lane", "right lane, near curb", "bike lane", "center lane"];
-const SEVERITIES = [2, 3, 3, 4, 2, 5] as const;
-const OUTCOMES: RideEventKind[] = ["confirmed", "new", "confirmed", "worse", "repaired", "confirmed"];
-
-// SAMPLE ENGINE: stands in for the camera detector + shared pothole memory until the backend is wired.
-// Every ~11s a pothole comes up ahead, counts down, then resolves against "what the last rider saw".
-export function useSampleRide(active: boolean, onAhead: (u: Upcoming) => void, onResult: (e: RideEvent) => void) {
-  const [upcoming, setUpcoming] = useState<Upcoming | null>(null);
-  const [distance, setDistance] = useState(0);
-  const cbs = useRef({ onAhead, onResult });
-  useEffect(() => { cbs.current = { onAhead, onResult }; }, [onAhead, onResult]);
-
-  useEffect(() => {
-    if (!active) return;
-    let n = 0;
-    const timers: ReturnType<typeof setTimeout | typeof setInterval>[] = [];
-    const cycle = () => {
-      const i = n++;
-      const outcome = OUTCOMES[i % OUTCOMES.length];
-      const u: Upcoming = {
-        id: `u${i}`, street: STREETS[i % STREETS.length], lane: LANES[i % LANES.length],
-        severity: SEVERITIES[i % SEVERITIES.length] as Upcoming["severity"], known: outcome !== "new", startFt: 150,
-      };
-      setUpcoming(u); setDistance(u.startFt); cbs.current.onAhead(u);
-      const tick = setInterval(() => setDistance((d) => Math.max(0, d - 10)), 330);
-      timers.push(tick);
-      timers.push(setTimeout(() => {
-        clearInterval(tick);
-        setUpcoming(null);
-        cbs.current.onResult({ id: u.id, kind: outcome, street: u.street, lane: u.lane, severity: outcome === "repaired" ? null : u.severity, at: Date.now() });
-      }, 5200));
-    };
-    timers.push(setTimeout(cycle, 3500));
-    timers.push(setInterval(cycle, 12000));
-    return () => { timers.forEach((t) => { clearTimeout(t as ReturnType<typeof setTimeout>); clearInterval(t as ReturnType<typeof setInterval>); }); setUpcoming(null); };
-  }, [active]);
-
-  return { upcoming, distance };
 }

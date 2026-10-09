@@ -7,9 +7,11 @@ import { ArrowUpRight } from "@/components/ui/Icons";
 import Reveal from "@/components/ui/Reveal";
 import { getPotholes, getStats } from "@/lib/data";
 
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
   const [potholes, stats] = await Promise.all([getPotholes(), getStats()]);
-  const story = potholes.filter((p) => p.sightings.length >= 4).sort((a, b) => b.sightings.length - a.sightings.length)[0] ?? potholes[0];
+  const story = [...potholes].sort((a, b) => b.sightings.length - a.sightings.length)[0]; // most-ridden pothole, if any exist yet
   return (
     <>
       <section className="wrap pt-14 sm:pt-20">
@@ -29,7 +31,7 @@ export default async function Home() {
         <div className="mx-auto mt-10 max-w-[1100px] sm:mt-14"><HeroScene /></div>
       </section>
       <Steps />
-      <OnePothole pothole={story} />
+      {story && <OnePothole pothole={story} />}
       <StatsStrip stats={stats} />
       <section className="wrap mt-28 text-center">
         <Reveal>

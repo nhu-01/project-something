@@ -1,10 +1,11 @@
 import Link from "next/link";
 import Bars from "@/components/ui/Bars";
 import Reveal from "@/components/ui/Reveal";
-import { getPotholes, getStats, IS_SAMPLE_DATA } from "@/lib/data";
+import { getPotholes, getStats } from "@/lib/data";
 import { ago } from "@/lib/format";
 
 export const metadata = { title: "progress · spotholes" };
+export const dynamic = "force-dynamic";
 
 export default async function StatsPage() {
   const [stats, potholes] = await Promise.all([getStats(), getPotholes()]);
@@ -13,7 +14,7 @@ export default async function StatsPage() {
   return (
     <div className="wrap pt-10 sm:pt-16">
       <Reveal>
-        <p className="eyebrow">progress{IS_SAMPLE_DATA ? " · sample data" : ""}</p>
+        <p className="eyebrow">progress · live from rider data</p>
         <h1 className="h2 mt-2 max-w-[20ch]">how the city&apos;s roads are doing.</h1>
       </Reveal>
       <dl className="mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-3xl border border-line bg-line md:grid-cols-4">
@@ -24,6 +25,7 @@ export default async function StatsPage() {
         <Reveal className="card p-6 sm:p-8">
           <h2 className="text-lg font-medium">streets to watch</h2>
           <ul className="mt-4 divide-y divide-line">
+            {stats.worstStreets.length === 0 && <li className="py-3 text-muted">nothing yet.</li>}
             {stats.worstStreets.map((s) => (
               <li key={s.street} className="flex items-center justify-between gap-4 py-3">
                 <div><p className="font-medium">{s.street}</p><p className="text-sm text-muted">{s.borough} · {s.open} open</p></div>

@@ -1,9 +1,11 @@
 import MapExplorer from "@/components/map/MapExplorer";
-import { getPotholes, IS_SAMPLE_DATA } from "@/lib/data";
+import { getPotholes } from "@/lib/data";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = { title: "map · spotholes" };
 
 export default async function MapPage() {
   const potholes = await getPotholes();
-  return <MapExplorer potholes={potholes} sample={IS_SAMPLE_DATA} />;
+  return <MapExplorer potholes={potholes} />;
 }

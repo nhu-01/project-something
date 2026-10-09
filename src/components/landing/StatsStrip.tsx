@@ -13,7 +13,6 @@ export default function StatsStrip({ stats }: { stats: Stats }) {
           </Reveal>
         ))}
       </dl>
-      <p className="mt-3 text-xs text-muted">sample data while the app is being built.</p>
     </section>
   );
 }

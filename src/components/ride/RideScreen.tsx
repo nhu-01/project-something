@@ -1,13 +1,14 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useCamera, useSampleRide, useSpeech, useWakeLock } from "./hooks";
+import { useRideEngine } from "./engine";
+import { useCamera, useSpeech, useWakeLock } from "./hooks";
 import Recap from "./Recap";
 import RideHud from "./RideHud";
 import SafetyIntro from "./SafetyIntro";
 import type { Phase, RideEvent, Upcoming } from "./types";
 import { SEV_WORD } from "@/lib/tokens";
 
-// intro → starting (permissions) → riding → recap. Detection is sample-driven until the backend/detector exists.
+// intro → starting (permissions) → riding → recap.
 export default function RideScreen() {
   const [phase, setPhase] = useState<Phase>("intro");
   const [events, setEvents] = useState<RideEvent[]>([]);
@@ -27,15 +28,14 @@ export default function RideScreen() {
   const onResult = useCallback((e: RideEvent) => {
     setEvents((cur) => [...cur, e]);
     setLast(e);
-    const copy = { new: "New pothole logged.", confirmed: "Confirmed.", worse: "It has gotten worse.", repaired: "Looks repaired." }[e.kind];
+    const copy = { new: "New pothole logged.", confirmed: "Confirmed.", worse: "It has gotten worse.", better: "It looks better.", repaired: "Looks repaired." }[e.kind];
     speech.say(copy);
   }, [speech]);
-  const { upcoming, distance } = useSampleRide(riding && !paused, onAhead, onResult);
+  const { upcoming, distance, gps, online } = useRideEngine({ active: riding, paused, videoRef: camera.ref, onAhead, onResult });
 
   // brief "starting" step so permission prompts happen after the tap
   useEffect(() => {
     if (phase !== "starting") return;
-    if ("geolocation" in navigator) navigator.geolocation.getCurrentPosition(() => {}, () => {}, { enableHighAccuracy: true, timeout: 6000 });
     const t = setTimeout(() => { startedAt.current = Date.now(); setPhase("riding"); }, 900);
     return () => clearTimeout(t);
   }, [phase]);
@@ -53,7 +53,7 @@ export default function RideScreen() {
   if (phase === "intro") return <SafetyIntro onStart={start} />;
   return (
     <RideHud
-      camera={camera.state} videoRef={camera.ref} upcoming={upcoming} distance={distance} last={last} paused={paused}
+      camera={camera.state} gps={gps} online={online} videoRef={camera.ref} upcoming={upcoming} distance={distance} last={last} paused={paused}
       voiceOn={speech.on} count={events.length} onTogglePause={() => setPaused((p) => !p)} onToggleVoice={() => speech.setOn(!speech.on)} onEnd={end}
     />
   );

@@ -18,7 +18,7 @@ export default function OnePothole({ pothole }: { pothole: Pothole }) {
             <div className="space-y-3 p-6">
               <div className="flex flex-wrap items-center gap-3"><StatusChip status={pothole.status} /><span className="text-sm text-muted">{pothole.street}, {pothole.borough} · {pothole.lane}</span></div>
               <SeverityMeter value={pothole.severity} />
-              <p className="text-sm text-muted">sample data · each rider&apos;s pass updates what we know.</p>
+              <p className="text-sm text-muted">a real pothole from the map. each rider&apos;s pass updates what we know.</p>
             </div>
           </div>
         </Reveal>

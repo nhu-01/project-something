@@ -8,7 +8,7 @@ import MapClient from "./MapClient";
 type StatusFilter = "all" | "open" | "repaired";
 const SEV_FILTERS = [{ label: "any severity", min: 1 }, { label: "3+ moderate", min: 3 }, { label: "4+ serious", min: 4 }];
 
-export default function MapExplorer({ potholes, sample }: { potholes: Pothole[]; sample: boolean }) {
+export default function MapExplorer({ potholes }: { potholes: Pothole[] }) {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [minSev, setMinSev] = useState(1);
   const [q, setQ] = useState("");
@@ -47,7 +47,7 @@ export default function MapExplorer({ potholes, sample }: { potholes: Pothole[];
       </div>
 
       <div className="pointer-events-none absolute bottom-3 left-3 z-[1000] flex items-center gap-2 rounded-full border border-line bg-card/95 px-4 py-2 text-sm backdrop-blur sm:bottom-4 sm:left-4">
-        <span className="font-medium">{visible.length}</span><span className="text-muted">potholes shown{sample ? " · sample data" : ""}</span>
+        <span className="font-medium">{visible.length}</span><span className="text-muted">{potholes.length === 0 ? "potholes yet. be the first to ride." : "potholes shown"}</span>
       </div>
 
       <DetailSheet pothole={selected} onClose={close} />

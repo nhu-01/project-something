@@ -31,7 +31,6 @@ export default function SafetyIntro({ onStart }: { onStart: () => void }) {
           start ride <ArrowUpRight />
         </button>
         <p className="mt-4 text-center text-sm text-muted">your phone will ask for camera and location access.</p>
-        <p className="mt-2 text-center text-xs text-muted">sample detections are shown while the real detector is being built.</p>
       </div>
     </div>
   );

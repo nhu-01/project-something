@@ -26,8 +26,8 @@ export type Pothole = {
   firstSeen: string;
   lastSeen: string;
   sightings: Sighting[]; // oldest first
-  seed: number; // drives the placeholder frame art until real photos exist
-  photo?: string; // real frame URL once the backend is wired
+  seed: number; // drives the drawn placeholder when a frame couldn't be kept (e.g. people in shot)
+  photo?: string; // rider camera frame
 };
 
 export type Stats = {

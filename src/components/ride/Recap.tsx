@@ -5,7 +5,7 @@ import { ArrowUpRight } from "@/components/ui/Icons";
 import { SEV_WORD } from "@/lib/tokens";
 import type { RideEvent } from "./types";
 
-const LABEL = { new: "new", confirmed: "confirmed", worse: "got worse", repaired: "repaired" } as const;
+const LABEL = { new: "new", confirmed: "confirmed", worse: "got worse", better: "looks better", repaired: "repaired" } as const;
 
 export default function Recap({ events, seconds, onAgain }: { events: RideEvent[]; seconds: number; onAgain: () => void }) {
   const count = (k: RideEvent["kind"]) => events.filter((e) => e.kind === k).length;

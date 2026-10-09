@@ -3,10 +3,10 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
 import { Pause, Volume } from "@/components/ui/Icons";
 import { SEV_WORD } from "@/lib/tokens";
-import type { RideEvent, Upcoming } from "./types";
+import type { GpsState, RideEvent, Upcoming } from "./types";
 
 const RESULT_COPY: Record<RideEvent["kind"], string> = {
-  new: "new pothole logged", confirmed: "confirmed. same as the last rider saw", worse: "it's gotten worse. updated", repaired: "looks repaired. thanks",
+  new: "new pothole logged", confirmed: "confirmed. same as the last rider saw", worse: "it's gotten worse. updated", better: "it looks better. updated", repaired: "looks repaired. thanks",
 };
 
 function useElapsed(running: boolean) {
@@ -17,6 +17,8 @@ function useElapsed(running: boolean) {
 
 type Props = {
   camera: "idle" | "on" | "denied";
+  gps: GpsState;
+  online: boolean;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   upcoming: Upcoming | null;
   distance: number;
@@ -29,7 +31,7 @@ type Props = {
   onEnd: () => void;
 };
 
-export default function RideHud({ camera, videoRef, upcoming, distance, last, paused, voiceOn, count, onTogglePause, onToggleVoice, onEnd }: Props) {
+export default function RideHud({ camera, gps, online, videoRef, upcoming, distance, last, paused, voiceOn, count, onTogglePause, onToggleVoice, onEnd }: Props) {
   const reduce = useReducedMotion();
   const elapsed = useElapsed(!paused);
   const mm = String(Math.floor(elapsed / 60)).padStart(2, "0"), ss = String(elapsed % 60).padStart(2, "0");
@@ -40,7 +42,7 @@ export default function RideHud({ camera, videoRef, upcoming, distance, last, pa
       <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" playsInline muted autoPlay aria-hidden />
       {camera !== "on" && (
         <div className="absolute inset-0 grid place-items-center bg-ink p-8 text-center text-sm text-paper/60">
-          {camera === "denied" ? "camera unavailable. continuing with location and voice only." : "starting camera…"}
+          {camera === "denied" ? "camera unavailable. you'll still get warnings, but new potholes can't be logged." : "starting camera…"}
         </div>
       )}
       <div className="absolute inset-0 bg-ink/25" aria-hidden />
@@ -49,7 +51,7 @@ export default function RideHud({ camera, videoRef, upcoming, distance, last, pa
       <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 p-4" style={{ paddingTop: "calc(env(safe-area-inset-top) + 16px)" }}>
         <div className="flex items-center gap-2 rounded-full bg-paper/90 px-4 py-2 text-sm text-ink backdrop-blur">
           <span className={`h-2 w-2 rounded-full bg-moss ${paused || reduce ? "" : "animate-pulse"}`} aria-hidden />
-          {paused ? "paused" : "scanning the road"}
+          {paused ? "paused" : !online ? "offline, retrying" : gps === "denied" ? "location is off" : gps === "waiting" ? "finding gps" : "scanning the road"}
           <span className="text-muted" aria-label={`elapsed ${mm} minutes ${ss} seconds`}>{mm}:{ss}</span>
         </div>
         <div className="flex items-center gap-2">
@@ -65,7 +67,7 @@ export default function RideHud({ camera, videoRef, upcoming, distance, last, pa
             <motion.div key={upcoming.id} {...rise} role="status" aria-live="assertive" className="w-full max-w-md rounded-[28px] bg-paper p-5 text-ink shadow-[0_18px_50px_rgb(0_0_0/0.35)]">
               <div className="flex items-end justify-between gap-4">
                 <div>
-                  <p className="text-sm text-muted">pothole ahead · {upcoming.known ? "reported by a rider before you" : "new, spotted by the camera"}</p>
+                  <p className="text-sm text-muted">pothole ahead · reported by a rider before you</p>
                   <p className="mt-1 text-2xl font-medium tracking-tight">{upcoming.lane}</p>
                   <p className="text-sm text-muted">{SEV_WORD[upcoming.severity]} · severity {upcoming.severity} of 5 · {upcoming.street}</p>
                 </div>

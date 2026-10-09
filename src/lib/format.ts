@@ -1,4 +1,4 @@
-const NOW = () => new Date("2026-10-09T18:00:00Z").getTime(); // sample-data clock; swap for Date.now() with the backend
+const NOW = () => Date.now();
 
 export const daysAgo = (iso: string) => Math.max(0, Math.floor((NOW() - new Date(iso).getTime()) / 86400000));
 
