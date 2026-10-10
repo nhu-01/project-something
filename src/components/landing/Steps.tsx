@@ -2,7 +2,12 @@ import { Bullet } from "@/components/ui/Bullet";
 import Reveal from "@/components/ui/Reveal";
 import type { Key, T } from "@/lib/i18n";
 
-const STEPS = [{ n: "1", glyph: "phone" }, { n: "2", glyph: "wave" }, { n: "3", glyph: "link" }] as const;
+// The step bullets are real Manhattan subway lines (the 1, the 4 and the 7), in their line colors.
+const STEPS = [
+  { n: "1", glyph: "phone", line: "1", color: "var(--line-red)" },
+  { n: "2", glyph: "wave", line: "4", color: "var(--line-green)" },
+  { n: "3", glyph: "link", line: "7", color: "var(--line-purple)" },
+] as const;
 
 function Glyph({ kind }: { kind: (typeof STEPS)[number]["glyph"] }) {
   const p = { width: 44, height: 44, viewBox: "0 0 44 44", fill: "none", stroke: "var(--ink)", strokeWidth: 1.4, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
@@ -19,7 +24,7 @@ export default function Steps({ t }: { t: T }) {
         {STEPS.map((s, i) => (
           <li key={s.n}>
             <Reveal delay={i * 0.08} className="card h-full p-7">
-              <div className="flex items-center justify-between"><Glyph kind={s.glyph} /><Bullet color="var(--line-red)">{s.n}</Bullet></div>
+              <div className="flex items-center justify-between"><Glyph kind={s.glyph} /><Bullet color={s.color}>{s.line}</Bullet></div>
               <h3 className="mt-8 text-xl font-medium tracking-tight">{t(`steps.${s.n}.title` as Key)}</h3>
               <p className="mt-2 text-muted">{t(`steps.${s.n}.body` as Key)}</p>
             </Reveal>

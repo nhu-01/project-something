@@ -5,9 +5,9 @@ Calm, clean, and quietly clever. A warm paper background, near-black ink, lots o
 Lowercase voice. The interface stays out of the way; the road and the data are the stars. Reference feel: Julia's Time Machine
 (juliastimemachine.tech), used with permission as a style reference. We build our own animations.
 
-The product: **Pothole Copilot**. Riders mount a phone and tap start; the app spots potholes, warns by voice, and remembers
-them so the next rider on the same path is warned (and their pass updates what we know). Everyone else follows progress on
-a map. Tagline: *ride. the city remembers.*
+The product: a photo record of New York's reported potholes. A volunteer finds the nearest 311 pothole (or a route past a
+few), films it as they ride past or submits a photo, and each spot collects many pictures. Everyone else follows progress on
+a map. Tagline: *find a pothole. snap it.*
 
 ## Tokens (define once in `globals.css`; never hard-code in components)
 | Token | Value | Use |
@@ -55,7 +55,7 @@ Primary button: ink fill, paper text. Secondary: outline. Hover lifts 2px over 1
 
 ## Motion
 Ease: `cubic-bezier(0.16, 1, 0.3, 1)` (expo out). Sheets rise ~14px and fade. Reveals once on scroll. Hero is an SVG route scene:
-two riders pass along one street; the first leaves potholes behind, the second gets warned. Everything respects
+two riders (bullets 1 and 4, real Manhattan line colors) pass along one street; the first photographs a reported spot, the second adds another picture. Everything respects
 `prefers-reduced-motion` (static scene, fades only). Animate only transform and opacity.
 
 ## Accessibility
@@ -63,4 +63,4 @@ Visible focus (moss ring), 44px minimum targets, status and severity always writ
 captions/voice never the only channel, safe-use warnings on the ride screen.
 
 ## Voice
-Short, lowercase, calm: "start a ride", "pothole ahead, right lane", "looks repaired". Everything shown is real rider data; never add sample data.
+Short, lowercase, calm: "start a ride", "pothole near you", "looks repaired". Everything shown is real; never add sample data.

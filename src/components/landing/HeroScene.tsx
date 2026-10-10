@@ -100,7 +100,7 @@ export default function HeroScene() {
           {/* rider 2 */}
           <g opacity="0">
             <animate attributeName="opacity" dur={dur} repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes={seq([0, R2_START, R2_START + 0.015, R2_END, R2_END + 0.02, 1])} />
-            <circle r={compact ? 20 : 13} fill="var(--line-red)" /><text y={compact ? 9 : 5} textAnchor="middle" fontSize={compact ? 29 : 15} fontWeight="700" fill="#fff" fontFamily="var(--font-hanken), sans-serif">2</text>
+            <circle r={compact ? 20 : 13} fill="var(--line-green)" /><text y={compact ? 9 : 5} textAnchor="middle" fontSize={compact ? 29 : 15} fontWeight="700" fill="#fff" fontFamily="var(--font-hanken), sans-serif">4</text>
             <animateMotion dur={dur} repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes={seq([0, R2_START, R2_END, 1])} calcMode="linear"><mpath href="#route" /></animateMotion>
           </g>
           {/* captions */}
