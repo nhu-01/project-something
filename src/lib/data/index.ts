@@ -8,7 +8,7 @@ type PRow = {
   id: number; lat: number; lng: number; street: string; borough: string; direction: string; lane: string; size: string;
   severity: number | null; status: string; kind: string | null; first_seen: string | Date; last_seen: string | Date; photo: string | null;
 };
-type SRow = { id: string | number; pothole_id: number; at: string | Date; rider: string; kind: string; severity: number | null; note: string };
+type SRow = { id: string | number; pothole_id: number; at: string | Date; rider: string; kind: string; severity: number | null; note: string; photo: string | null };
 
 const iso = (d: string | Date) => new Date(d).toISOString();
 const sev = (n: number | null) => (n == null ? null : (Math.min(5, Math.max(1, n)) as Severity));
@@ -20,14 +20,14 @@ function shape(p: PRow, sightings: SRow[]): Pothole {
     kind: (p.kind === "bump" || p.kind === "rough" ? p.kind : "pothole") as Pothole["kind"],
     severity: sev(p.severity), status: (p.status === "repaired" ? "repaired" : "open") as Status,
     firstSeen: iso(p.first_seen), lastSeen: iso(p.last_seen), seed: p.id * 7919, photo: p.photo ?? undefined,
-    sightings: sightings.map((s): Sighting => ({ id: String(s.id), at: iso(s.at), rider: s.rider, kind: s.kind as SightingKind, severity: sev(s.severity), note: s.note })),
+    sightings: sightings.map((s): Sighting => ({ id: String(s.id), at: iso(s.at), rider: s.rider, kind: s.kind as SightingKind, severity: sev(s.severity), note: s.note, photo: s.photo ?? undefined })),
   };
 }
 
 export async function getPotholes(): Promise<Pothole[]> {
   const rows = await query<PRow>("SELECT * FROM potholes WHERE merged_into IS NULL ORDER BY last_seen DESC LIMIT 2000");
   if (!rows.length) return [];
-  const sightings = await query<SRow>("SELECT id, pothole_id, at, rider, kind, severity, note FROM sightings ORDER BY at ASC");
+  const sightings = await query<SRow>("SELECT id, pothole_id, at, rider, kind, severity, note, photo FROM sightings ORDER BY at ASC");
   const by = new Map<number, SRow[]>();
   for (const s of sightings) by.set(s.pothole_id, [...(by.get(s.pothole_id) ?? []), s]);
   return rows.map((p) => shape(p, by.get(p.id) ?? []));
@@ -39,7 +39,7 @@ export async function getPothole(id: string): Promise<Pothole | null> {
   // a duplicate that was folded into another hazard: show the one it became part of
   if (p?.merged_into) [p] = await query<PRow & { merged_into: number | null }>("SELECT * FROM potholes WHERE id=$1", [p.merged_into]);
   if (!p) return null;
-  return shape(p, await query<SRow>("SELECT id, pothole_id, at, rider, kind, severity, note FROM sightings WHERE pothole_id=$1 ORDER BY at ASC", [p.id]));
+  return shape(p, await query<SRow>("SELECT id, pothole_id, at, rider, kind, severity, note, photo FROM sightings WHERE pothole_id=$1 ORDER BY at ASC", [p.id]));
 }
 
 // Hide the start and end of every ride, so tracks don't point at anyone's home: 12% of the ride at each end,
