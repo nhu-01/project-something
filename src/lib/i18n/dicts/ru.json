@@ -199,7 +199,6 @@
  "home.heroSpot_one": "311 · {n} фото",
  "home.heroSpot_other": "311 · фото: {n}",
  "map.layers": "слои карты",
- "map.layerRider": "отчеты райдеров ({n})",
  "map.layerCityNone": "311 · без фото ({n})",
  "map.layerCityPhoto": "311 · с фото ({n})",
  "map.photosN": "{n} фото",

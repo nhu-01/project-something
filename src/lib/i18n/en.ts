@@ -225,7 +225,7 @@ export const en = {
   "home.heroSpot_one": "311 · {n} photo",
   "home.heroSpot_other": "311 · photos: {n}",
   "map.layers": "map layers",
-  "map.layerRider": "rider reports ({n})",
+  "map.layerRider": "non-311 reports ({n})",
   "map.layerCityNone": "311 · no photo ({n})",
   "map.layerCityPhoto": "311 · photographed ({n})",
   "map.photosN": "{n} photos",

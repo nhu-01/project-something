@@ -199,7 +199,6 @@
  "home.heroSpot_one": "311 · {n} photo",
  "home.heroSpot_other": "311 · photos : {n}",
  "map.layers": "couches de la carte",
- "map.layerRider": "signalements de cyclistes ({n})",
  "map.layerCityNone": "311 · sans photo ({n})",
  "map.layerCityPhoto": "311 · photographié ({n})",
  "map.photosN": "{n} photos",

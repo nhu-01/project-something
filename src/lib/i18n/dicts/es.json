@@ -199,7 +199,6 @@
  "home.heroSpot_one": "311 · {n} foto",
  "home.heroSpot_other": "311 · fotos: {n}",
  "map.layers": "capas del mapa",
- "map.layerRider": "reportes de ciclistas ({n})",
  "map.layerCityNone": "311 · sin foto ({n})",
  "map.layerCityPhoto": "311 · fotografiado ({n})",
  "map.photosN": "{n} fotos",

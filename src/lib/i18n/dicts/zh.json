@@ -199,7 +199,6 @@
  "home.heroSpot_one": "311 · {n} 张照片",
  "home.heroSpot_other": "311 · 照片：{n}",
  "map.layers": "地图图层",
- "map.layerRider": "骑手报告 ({n})",
  "map.layerCityNone": "311 · 无照片 ({n})",
  "map.layerCityPhoto": "311 · 已拍照 ({n})",
  "map.photosN": "{n} 张照片",
