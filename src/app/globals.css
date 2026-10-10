@@ -101,7 +101,8 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
 
 /* ---------- Map ---------- */
 .map-shell .leaflet-container { background: var(--paper); font-family: var(--font-sans); height: 100%; width: 100%; }
-.map-shell .leaflet-tile-pane { filter: grayscale(1) contrast(0.85) brightness(1.08) sepia(0.06); }
+/* The map is in color; this only softens it a touch so the pins and the paper UI still lead. */
+.map-shell .leaflet-tile-pane { filter: saturate(0.9) contrast(0.96) brightness(1.03); }
 .map-shell .leaflet-control-zoom { border: 1px solid var(--line); border-radius: 9999px; overflow: hidden; background: var(--card); }
 .map-shell .leaflet-control-zoom a { width: 40px; height: 40px; line-height: 38px; color: var(--ink); background: var(--card); border: 0; }
 .map-shell .leaflet-control-attribution { font-size: 10px; background: color-mix(in srgb, var(--paper) 80%, transparent); }

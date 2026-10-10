@@ -21,7 +21,8 @@ a map. Tagline: *ride. the city remembers.*
 | `--card` | `#FFFFFF` | cards, sheets |
 
 ### Subway colors
-The city's subway line colors are the only color on the site, used sparingly as small **bullets** (a colored circle with a
+The map itself is in color (OpenStreetMap's standard tiles, softened slightly: green parks, blue water). Apart from that, the city's
+subway line colors are the only color on the site, used sparingly as small **bullets** (a colored circle with a
 number), never as backgrounds or large fills:
 
 | Use | Color |

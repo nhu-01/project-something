@@ -5,7 +5,7 @@ next rider on the same path is warned and updates what we know. Non-riders use t
 Domain: spotholes.nyc. See @DESIGN.md for the design system (cream paper, ink, Hanken Grotesk, pill shapes).
 
 ## Status
-Live at spotholes.vercel.app (domain spotholes.nyc still to be pointed at it). Everything shown is real rider data:
+Live at spotholes.nyc (also spotholes.vercel.app). Deploys are manual: `npx vercel deploy --prod`. Everything shown is real rider data:
 there is no sample, demo or seed data anywhere, and none should be added. An earlier attempt lives on `feat/initial-build`.
 
 ## Stack
