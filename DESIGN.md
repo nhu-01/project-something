@@ -7,7 +7,7 @@ Lowercase voice. The interface stays out of the way; the road and the data are t
 
 The product: a photo record of New York's reported potholes. A volunteer finds the nearest 311 pothole (or a route past a
 few), films it as they ride past or submits a photo, and each spot collects many pictures. Everyone else follows progress on
-a map. Tagline: *find a pothole. snap it.*
+a map. Tagline: *spot a pothole. snap it.*
 
 ## Tokens (define once in `globals.css`; never hard-code in components)
 | Token | Value | Use |

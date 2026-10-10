@@ -1,6 +1,6 @@
 # spotholes
 
-Pothole photo record for NYC. Slogan: "find a pothole. snap it." A volunteer opens the site, finds the nearest reported
+Pothole photo record for NYC. Slogan: "spot a pothole. snap it." A volunteer opens the site, finds the nearest reported
 311 pothole (or a route past several) and adds pictures of it: filmed as they ride past (the camera judges frames) or a
 photo submitted by hand. Each 311 report collects many photos over time, like Austin's and Boston's ticket pages.
 Riders can also log hazards nobody reported; those are circles on the map, 311 reports are rounded squares.

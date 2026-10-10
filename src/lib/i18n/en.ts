@@ -6,7 +6,7 @@ export const en = {
   "nav.map": "map",
   "nav.report": "report",
   "nav.progress": "progress",
-  "nav.start": "find a pothole",
+  "nav.start": "spot a pothole",
   "nav.language": "language",
   "footer.independent": "spotholes.nyc · an independent project, not affiliated with the city of new york",
   "footer.reportLink": "report a spot by photo",
@@ -18,7 +18,7 @@ export const en = {
 
   // home
   "home.eyebrow": "help the city see its potholes",
-  "home.title1": "find a pothole.",
+  "home.title1": "spot a pothole.",
   "home.title2": "snap it.",
   "home.introBefore": "new york has thousands of reported",
   "home.introAfter": "with no picture. find the nearest one, film it as you pass or snap a photo, and help the city see it.",

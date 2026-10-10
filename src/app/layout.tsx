@@ -16,7 +16,7 @@ const gothic = League_Gothic({ subsets: ["latin"], variable: "--font-gothic" });
 const hanken = Hanken_Grotesk({ subsets: ["latin", "latin-ext", "cyrillic-ext", "vietnamese"], variable: "--font-hanken" });
 
 export const metadata: Metadata = {
-  title: "spotholes: find a pothole, snap it",
+  title: "spotholes: spot a pothole, snap it",
   description: "Find the nearest reported pothole in new york, film it as you ride or snap a photo, and help the city see what's broken.",
 };
 export const viewport: Viewport = { themeColor: "#fafaf7", viewportFit: "cover" };
