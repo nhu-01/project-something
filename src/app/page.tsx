@@ -23,7 +23,9 @@ const SWAP = [
 
 export default async function Home() {
   const [potholes, stats] = await Promise.all([getPotholes(), getStats()]);
-  const story = [...potholes].sort((a, b) => b.sightings.length - a.sightings.length)[0]; // most-ridden pothole, if any exist yet
+  // the most-ridden hazards that have camera frames, for the photo reel
+  const hasPhoto = (p: (typeof potholes)[number]) => Boolean(p.photo) || p.sightings.some((x) => x.photo);
+  const stories = potholes.filter(hasPhoto).sort((a, b) => b.sightings.length - a.sightings.length).slice(0, 5);
   return (
     <>
       <section className="wrap pt-14 sm:pt-20">
@@ -47,7 +49,7 @@ export default async function Home() {
       </section>
       <Ticker potholes={potholes} />
       <Steps />
-      {story && <OnePothole pothole={story} />}
+      {stories.length > 0 && <OnePothole potholes={stories} />}
       <StatsStrip stats={stats} />
       <section className="wrap mt-28 text-center">
         <Reveal>

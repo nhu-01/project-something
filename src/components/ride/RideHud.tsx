@@ -18,14 +18,13 @@ function useElapsed(running: boolean) {
 }
 
 type Props = {
-  camera: "idle" | "on" | "denied";
   gps: GpsState;
   online: boolean;
-  videoRef: React.RefObject<HTMLVideoElement | null>;
   upcoming: Upcoming | null;
   distance: number;
   last: RideEvent | null;
   events: RideEvent[];
+  heading: string | null; // short note about where the rider said they're going
   notice: string | null;
   paused: boolean;
   voiceOn: boolean;
@@ -37,21 +36,14 @@ type Props = {
   onEnd: () => void;
 };
 
-export default function RideHud({ camera, gps, online, videoRef, upcoming, distance, last, events, notice, paused, voiceOn, torch, onToggleTorch, count, onTogglePause, onToggleVoice, onEnd }: Props) {
+export default function RideHud({ gps, online, upcoming, distance, last, events, heading, notice, paused, voiceOn, torch, onToggleTorch, count, onTogglePause, onToggleVoice, onEnd }: Props) {
   const reduce = useReducedMotion();
   const elapsed = useElapsed(!paused);
   const mm = String(Math.floor(elapsed / 60)).padStart(2, "0"), ss = String(elapsed % 60).padStart(2, "0");
   const rise = { initial: { opacity: 0, y: reduce ? 0 : 28 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: reduce ? 0 : 16 }, transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] as const } };
 
   return (
-    <div className="fixed inset-0 z-[3000] bg-ink text-paper" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-      <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" playsInline muted autoPlay aria-hidden />
-      {camera !== "on" && (
-        <div className="absolute inset-0 grid place-items-center bg-ink p-8 text-center text-sm text-paper/60">
-          {camera === "denied" ? "camera unavailable. you'll still get warnings, but new potholes can't be logged." : "starting camera…"}
-        </div>
-      )}
-      <div className="absolute inset-0 bg-ink/25" aria-hidden />
+    <div className="absolute inset-0">
       {/* quiet viewfinder corners, so it reads as a camera that is watching */}
       <div className="pointer-events-none absolute inset-[9%] rounded-[28px] border border-paper/25" aria-hidden />
       {last?.shot && <Snapshot key={last.id} src={last.shot} aspect={last.shotAspect ?? 0.5625} />}
@@ -83,6 +75,8 @@ export default function RideHud({ camera, gps, online, videoRef, upcoming, dista
           <button onClick={onToggleVoice} aria-pressed={voiceOn} aria-label={voiceOn ? "mute voice" : "unmute voice"} className={`grid h-11 w-11 place-items-center rounded-full backdrop-blur ${voiceOn ? "bg-paper/90 text-ink" : "bg-paper/30 text-paper"}`}><Volume /></button>
         </div>
       </div>
+
+      {heading && <p className="absolute left-4 max-w-[62%] truncate rounded-full bg-paper/80 px-3 py-1.5 text-xs text-ink backdrop-blur" style={{ top: "calc(env(safe-area-inset-top) + 68px)" }}>{heading}</p>}
 
       {/* warning + result */}
       <div className="absolute inset-x-0 bottom-28 flex flex-col items-center gap-3 px-4" style={{ bottom: "calc(env(safe-area-inset-bottom) + 112px)" }}>

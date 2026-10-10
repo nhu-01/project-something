@@ -34,6 +34,7 @@ export default function MapView({ potholes, tracks, selectedId, onSelect }: Prop
     if (!el) return;
     const m = L.map(el, { center: [40.7306, -73.9352], zoom: 11, zoomControl: false, scrollWheelZoom: false });
     L.control.zoom({ position: "bottomright" }).addTo(m);
+    // OpenStreetMap's standard tiles, in color (green parks, blue water). They need no API key.
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(m);

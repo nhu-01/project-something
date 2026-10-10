@@ -5,7 +5,11 @@ import { allPhrases, isLang, LANG_CODES, type Lang } from "@/lib/voice";
 export const maxDuration = 30;
 
 const PHRASES = Object.fromEntries(LANG_CODES.map((l) => [l, allPhrases(l)])) as Record<Lang, Set<string>>;
-const DEFAULT_VOICE = "SAz9YHcvj6GT2YYXdXww"; // ElevenLabs premade voice "River" (calm, neutral; usable on the free plan)
+// ElevenLabs premade voices (usable on the free plan). Override with ELEVENLABS_VOICE_FEMALE / _MALE.
+const VOICES = {
+  f: () => process.env.ELEVENLABS_VOICE_FEMALE || "EXAVITQu4vr4xnSDxMaL", // "Sarah": mature, reassuring
+  m: () => process.env.ELEVENLABS_VOICE_MALE || "nPczCjzI2devNBz1zQrb", // "Brian": deep, comforting
+} as const;
 
 // Speaks one of the app's fixed phrases, in the rider's language, with ElevenLabs' multilingual model.
 // Each phrase is generated once, then served from Blob.
@@ -16,7 +20,7 @@ export async function GET(req: Request) {
   if (!isLang(lang) || !PHRASES[lang].has(text)) return new Response("unknown phrase", { status: 400 });
   const key = process.env.ELEVENLABS_API_KEY;
   if (!key) return new Response("voice not configured", { status: 501 });
-  const voice = process.env.ELEVENLABS_VOICE_ID || DEFAULT_VOICE;
+  const voice = VOICES[params.get("voice") === "m" ? "m" : "f"]();
   const useBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN) && process.env.USE_LOCAL_DB !== "1";
   const pathname = `voice/${voice}/${lang}/${createHash("sha1").update(text).digest("hex")}.mp3`;
 

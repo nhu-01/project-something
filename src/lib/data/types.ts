@@ -10,6 +10,7 @@ export type Sighting = {
   kind: SightingKind;
   severity: Severity | null;
   note: string;
+  photo?: string; // the camera frame from this pass, when one was kept
 };
 
 export type Pothole = {
