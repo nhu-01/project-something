@@ -25,7 +25,7 @@ const save = (key: string, value: string) => { try { localStorage.setItem(key, v
 
 // The camera opens straight away. Setup is a pop-up over it; "start ride" swaps the pop-up for the ride display.
 // intro (camera + setup pop-up) → riding → recap.
-export default function RideScreen({ demo = false }: { demo?: boolean }) {
+export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: boolean; demoPhotos?: string[] }) {
   const [phase, setPhase] = useState<Phase>("intro");
   const [events, setEvents] = useState<RideEvent[]>([]);
   const [last, setLast] = useState<RideEvent | null>(null);
@@ -91,7 +91,7 @@ export default function RideScreen({ demo = false }: { demo?: boolean }) {
   const onTargetClose = useCallback(() => speech.say(voicePhrase(lang, "spotAhead"), lang), [speech, lang]);
   const onAtSpot = useCallback(() => speech.say(voicePhrase(lang, "atSpot"), lang, true), [speech, lang]);
   const onNext = useCallback((place: string | null) => speech.say(voicePhrase(lang, place ? "next" : "finished"), lang), [speech, lang]);
-  const { pos, gps, online, spots, hazards, stops, target, alert, skip, finished } = useRideEngine({ active: riding, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, demo });
+  const { pos, gps, online, spots, hazards, stops, target, alert, skip, finished } = useRideEngine({ active: riding, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, demo, demoPhotos });
   const compass = useCompass(riding);
 
   // Say so the first time GPS locks on, so the rider knows it's working without looking.
@@ -124,15 +124,24 @@ export default function RideScreen({ demo = false }: { demo?: boolean }) {
     setSummary({ seconds: Math.round((Date.now() - startedAt.current) / 1000) });
     setPhase("recap");
   };
+  // The demo wraps up on its own once every spot on the loop has its photos.
+  const endRef = useRef(end);
+  useEffect(() => { endRef.current = end; });
+  useEffect(() => {
+    if (!demo || !riding || !finished) return;
+    const id = setTimeout(() => endRef.current(), 4000);
+    return () => clearTimeout(id);
+  }, [demo, riding, finished]);
   const hearGuide = () => { speech.unlock(); speech.say(voicePhrase(lang, "guide"), lang, true); };
 
-  if (phase === "recap") return <Recap events={events} seconds={summary.seconds} onAgain={() => { setRoute(null); setPhase("intro"); }} />;
+  if (phase === "recap") return <Recap demo={demo} demoPhotos={demoPhotos} events={events} seconds={summary.seconds} onAgain={() => { setRoute(null); setPhase("intro"); }} />;
 
   return (
     <div className="fixed inset-0 z-[3000] bg-ink text-paper">
       {/* one camera for both setup and the ride, so it never restarts in between */}
       <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" playsInline muted autoPlay aria-hidden />
-      {demo && <div className="absolute inset-0 bg-[linear-gradient(180deg,#2b2c28,#1a1b19)]" aria-hidden><div className="absolute inset-y-0 left-1/2 w-[3px] -translate-x-1/2 bg-[repeating-linear-gradient(180deg,rgba(250,250,247,.35)_0_40px,transparent_40px_80px)]" /></div>}
+      {demo && demoPhotos[0] && <img src={demoPhotos[0]} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+      {demo && !demoPhotos[0] && <div className="absolute inset-0 bg-[linear-gradient(180deg,#2b2c28,#1a1b19)]" aria-hidden><div className="absolute inset-y-0 left-1/2 w-[3px] -translate-x-1/2 bg-[repeating-linear-gradient(180deg,rgba(250,250,247,.35)_0_40px,transparent_40px_80px)]" /></div>}
       {!demo && cameraState !== "on" && (
         // out of the way at the top, so it never lands behind the setup card
         <p role="status" className="absolute inset-x-6 text-center text-sm text-paper/70" style={{ top: "calc(env(safe-area-inset-top) + 84px)" }}>

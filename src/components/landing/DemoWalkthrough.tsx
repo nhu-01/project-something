@@ -8,7 +8,7 @@ import { Volume } from "@/components/ui/Icons";
 import { useI18n } from "@/lib/i18n/client";
 import { voicePhrase, type VoiceKey } from "@/lib/voice";
 import type { Key } from "@/lib/i18n";
-import { ChooseScene, FollowScene, GrowScene, MapScene, SnapScene } from "./DemoScenes";
+import { ChooseScene, FollowScene, GrowScene, MapScene, PhoneFrame, SnapScene } from "./DemoScenes";
 
 const STEP_MS = 5600;
 const STEP_MS_TALKING = 9000; // long enough for the narration to finish
@@ -60,13 +60,11 @@ export default function DemoWalkthrough({ photos }: { photos: string[] }) {
       </Reveal>
       <div className="mt-10 grid items-center gap-10 md:grid-cols-[auto_1fr]">
         <Reveal className="mx-auto">
-          <div className="relative aspect-[9/18.5] w-[270px] overflow-hidden rounded-[40px] border-[7px] border-ink bg-ink shadow-[0_24px_60px_rgb(32_33_30/0.25)]" role="img" aria-label={t(`demo.s${step + 1}.title` as Key)}>
+          <PhoneFrame label={t(`demo.s${step + 1}.title` as Key)}>
             <AnimatePresence mode="wait">
               <motion.div key={step} className="absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }}>{scene}</motion.div>
             </AnimatePresence>
-            <span className="absolute left-1/2 top-2 h-4 w-16 -translate-x-1/2 rounded-full bg-ink" aria-hidden />
-            <span className="absolute end-3 top-2.5 rounded-full bg-taxi px-2 py-0.5 text-[9px] font-semibold text-ink" aria-hidden>{t("demo.tag")}</span>
-          </div>
+          </PhoneFrame>
         </Reveal>
         <ol className="space-y-3">
           {STEPS.map((s, i) => (

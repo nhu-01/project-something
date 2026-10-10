@@ -71,12 +71,13 @@ type Opts = {
   onAtSpot: (place: string) => void; // arrived at it
   onNext: (place: string | null) => void; // moved on to a new target (null: nothing left)
   onNear: (place: string) => void; // a pothole is close by
+  demoPhotos?: string[]; // real rider frames the demo "captures"
   demo?: boolean; // a scripted ride past real 311 spots: no GPS, no camera, nothing is sent or saved
 };
 
 // Runs a ride: follows the rider's GPS, points to the next 311 spot, and sends camera frames to the server, which adds
 // photos to the 311 report you are standing at (or logs a new hazard anywhere else).
-export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, demo = false }: Opts) {
+export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, demo = false, demoPhotos = [] }: Opts) {
   const [pos, setPos] = useState<Pos | null>(null);
   const [gps, setGps] = useState<GpsState>("waiting");
   const [online, setOnline] = useState(true);
@@ -98,6 +99,8 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
   const posRef = useRef<Pos | null>(null);
   const targetIdRef = useRef<string | null>(null);
   const targetRef = useRef<Spot | null>(null);
+  const photosRef = useRef(demoPhotos); // read inside the effect without restarting it
+  useEffect(() => { photosRef.current = demoPhotos; }, [demoPhotos]);
   const spotsRef = useRef<Spot[]>([]); // read by the timer, which must not run inside a state updater
   const hazardsRef = useRef<NearbyHazard[]>([]);
 
@@ -130,7 +133,7 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
     if (!demo) void ensureRide();
     const rideTimer = demo ? null : setInterval(() => void ensureRide(), 5000);
 
-    const emit = (e: ServerEvent | null | undefined, frame?: { blob: Blob; aspect: number } | null) => {
+    const emit = (e: ServerEvent | null | undefined, frame?: { blob: Blob; aspect: number } | null, shotUrl?: string) => {
       if (!e || stopped) return;
       const source = e.source === "311" ? "311" : "rider";
       if (source === "311") {
@@ -139,7 +142,7 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
       }
       live.current.onResult({
         id: `${source}-${e.potholeId}-${e.kind}-${Date.now()}`, kind: e.kind, source, hazard: toHazard(e.hazard), spotId: e.potholeId, street: e.street, lane: e.lane,
-        severity: toSev(e.severity), at: Date.now(), shot: frame ? URL.createObjectURL(frame.blob) : undefined, shotAspect: frame?.aspect,
+        severity: toSev(e.severity), at: Date.now(), shot: frame ? URL.createObjectURL(frame.blob) : shotUrl, shotAspect: frame ? frame.aspect : shotUrl ? 0.5625 : undefined,
       });
     };
 
@@ -201,7 +204,7 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
           posRef.current = start; setPos(start);
         } catch { /* offline: the demo just waits */ }
       })();
-      let hold = 0;
+      let hold = 0, demoShot = 0;
       simTimer = setInterval(() => {
         const p = posRef.current, tg = targetRef.current;
         if (stopped || live.current.paused || !p || !tg) return;
@@ -212,7 +215,7 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
           posRef.current = next; setPos(next); hold = 0;
           return;
         }
-        if (++hold % 4 === 0) emit({ kind: "photo", source: "311", potholeId: tg.id, hazard: "pothole", street: tg.place, lane: "right lane", severity: 3 }, null);
+        if (++hold % 4 === 0) emit({ kind: "photo", source: "311", potholeId: tg.id, hazard: "pothole", street: tg.place, lane: "right lane", severity: 3 }, null, photosRef.current.length ? photosRef.current[demoShot++ % photosRef.current.length] : undefined);
       }, 400);
     }
 

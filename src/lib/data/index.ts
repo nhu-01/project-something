@@ -23,6 +23,17 @@ function shape(p: PRow, sightings: SRow[]): Pothole {
   };
 }
 
+// Real rider frames, newest-most-ridden first, for the walkthrough and demo ride screens.
+export async function getDemoPhotos(max = 6): Promise<string[]> {
+  const list = await getPotholes();
+  return list
+    .filter((p) => p.photo || p.sightings.some((s) => s.photo))
+    .sort((a, b) => b.sightings.length - a.sightings.length)
+    .flatMap((p) => [p.photo, ...p.sightings.map((s) => s.photo)])
+    .filter((u): u is string => Boolean(u))
+    .slice(0, max);
+}
+
 export async function getPotholes(): Promise<Pothole[]> {
   const rows = await query<PRow>("SELECT * FROM potholes WHERE merged_into IS NULL ORDER BY last_seen DESC LIMIT 2000");
   if (!rows.length) return [];

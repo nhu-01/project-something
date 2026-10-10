@@ -9,18 +9,16 @@ import StatsStrip from "@/components/landing/StatsStrip";
 import DemoWalkthrough from "@/components/landing/DemoWalkthrough";
 import { ArrowUpRight } from "@/components/ui/Icons";
 import Reveal from "@/components/ui/Reveal";
-import { getPotholes, getStats } from "@/lib/data";
+import { getDemoPhotos, getPotholes, getStats } from "@/lib/data";
 import { getT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [potholes, stats, { t, lang }] = await Promise.all([getPotholes(), getStats(), getT()]);
+  const [potholes, stats, demoPhotos, { t, lang }] = await Promise.all([getPotholes(), getStats(), getDemoPhotos(), getT()]);
   // the most-ridden hazards that have camera frames, for the photo reel
   const hasPhoto = (p: (typeof potholes)[number]) => Boolean(p.photo) || p.sightings.some((x) => x.photo);
   const stories = potholes.filter(hasPhoto).sort((a, b) => b.sightings.length - a.sightings.length).slice(0, 5);
-  // real frames from riders for the walkthrough's phone screens
-  const demoPhotos = stories.flatMap((p) => [p.photo, ...p.sightings.map((x) => x.photo)]).filter((u): u is string => Boolean(u)).slice(0, 6);
   const swap = [
     { text: t("home.swap.potholes"), color: "var(--line-red)" },
     { text: t("home.swap.bumps"), color: "var(--line-orange)" },
