@@ -6,7 +6,7 @@ import Ticker from "@/components/motion/Ticker";
 import WordSwap from "@/components/motion/WordSwap";
 import OnePothole from "@/components/landing/OnePothole";
 import StatsStrip from "@/components/landing/StatsStrip";
-import Steps from "@/components/landing/Steps";
+import DemoWalkthrough from "@/components/landing/DemoWalkthrough";
 import { ArrowUpRight } from "@/components/ui/Icons";
 import Reveal from "@/components/ui/Reveal";
 import { getPotholes, getStats } from "@/lib/data";
@@ -19,6 +19,8 @@ export default async function Home() {
   // the most-ridden hazards that have camera frames, for the photo reel
   const hasPhoto = (p: (typeof potholes)[number]) => Boolean(p.photo) || p.sightings.some((x) => x.photo);
   const stories = potholes.filter(hasPhoto).sort((a, b) => b.sightings.length - a.sightings.length).slice(0, 5);
+  // real frames from riders for the walkthrough's phone screens
+  const demoPhotos = stories.flatMap((p) => [p.photo, ...p.sightings.map((x) => x.photo)]).filter((u): u is string => Boolean(u)).slice(0, 6);
   const swap = [
     { text: t("home.swap.potholes"), color: "var(--line-red)" },
     { text: t("home.swap.bumps"), color: "var(--line-orange)" },
@@ -46,7 +48,7 @@ export default async function Home() {
       {/* auto-swapping photos of one spot, right under the slogan */}
       {stories.length > 0 && <OnePothole potholes={stories} t={t} className="mt-12 sm:mt-16" />}
       <Ticker potholes={potholes} t={t} lang={lang} />
-      <Steps t={t} />
+      <DemoWalkthrough photos={demoPhotos} />
       <StatsStrip stats={stats} t={t} />
       <section className="wrap mt-28 text-center">
         <Reveal>

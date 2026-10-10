@@ -43,6 +43,7 @@
   --color-moss: var(--moss);
   --color-repaired: var(--repaired);
   --color-line-red: var(--line-red);
+  --color-taxi: var(--taxi);
   --color-card: var(--card);
   --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-gothic), var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
@@ -147,3 +148,23 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
 .ride-pin--city, .ride-pin--target { background: var(--paper); }
 .ride-pin--city { border-radius: 8px; border-color: var(--ink); opacity: 0.85; }
 .ride-pin--target { border-radius: 10px; width: 36px; height: 36px; border-color: var(--ink); box-shadow: 0 0 0 4px var(--taxi); }
+
+/* walkthrough scenes: transform and opacity only, and none of it runs with reduced motion */
+.demo-anim { animation-fill-mode: both; animation-timing-function: var(--ease); }
+.demo-rise { animation: demo-rise 0.6s both; }
+.demo-pop { animation: demo-pop 0.5s both; }
+.demo-turn { animation: demo-turn 4.2s linear both; }
+.demo-flash { animation: demo-flash 0.35s both; opacity: 0; }
+.demo-fly { animation: demo-fly 0.6s both; }
+.demo-pick { animation: demo-pick 0.4s both; }
+.demo-tap { animation: demo-tap 0.7s both; opacity: 0; }
+.demo-progress { animation: demo-progress linear both; }
+@keyframes demo-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes demo-pop { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
+@keyframes demo-turn { from { transform: rotate(75deg); } to { transform: rotate(0deg); } }
+@keyframes demo-flash { 0% { opacity: 0; } 30% { opacity: 0.8; } 100% { opacity: 0; } }
+@keyframes demo-fly { from { opacity: 0; transform: translate(-90px, 120px) scale(2.2); } to { opacity: 1; transform: none; } }
+@keyframes demo-pick { to { background: var(--sage); } }
+@keyframes demo-tap { 0% { opacity: 0.9; transform: translateY(-50%) scale(0.5); } 100% { opacity: 0; transform: translateY(-50%) scale(1.8); } }
+@keyframes demo-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { .demo-anim { animation: none !important; opacity: 1 !important; transform: none !important; } .demo-flash { opacity: 0 !important; } .demo-tap { opacity: 0 !important; } }
