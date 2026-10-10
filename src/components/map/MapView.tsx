@@ -4,25 +4,28 @@ import "leaflet.markercluster";
 import { useEffect, useRef } from "react";
 import { escapeHtml } from "@/lib/escape";
 import type { CityReport, Mission, Pothole, Track } from "@/lib/data/types";
-import { SEV_WORD } from "@/lib/tokens";
+
+// Text for the pins' screen-reader labels, supplied by the page in the visitor's language.
+export type PinLabels = { hazard: Record<string, string>; sev: Record<number, string>; repaired: string; city: string };
 
 type Props = {
+  labels: PinLabels;
   potholes: Pothole[]; tracks: Track[]; selectedId: string | null; onSelect: (id: string) => void;
   city: CityReport[]; onSelectCity: (id: string) => void; mission: Mission | null;
 };
 
 // A 311 report nobody has photographed yet: a hollow, dashed pin, so it never reads as a confirmed hazard.
-function cityIcon(r: CityReport) {
+function cityIcon(r: CityReport, labels: PinLabels) {
   return L.divIcon({
     className: "pin-wrap",
-    html: `<button type="button" class="pin pin--city" aria-label="${escapeHtml(`reported to 311 at ${r.place}, no photo yet`)}"><span class="pin-dot" aria-hidden="true">311</span></button>`,
+    html: `<button type="button" class="pin pin--city" aria-label="${escapeHtml(`${labels.city}: ${r.place}`)}"><span class="pin-dot" aria-hidden="true">311</span></button>`,
     iconSize: [44, 44], iconAnchor: [22, 22],
   });
 }
 
-function pinIcon(p: Pothole, selected: boolean) {
+function pinIcon(p: Pothole, selected: boolean, labels: PinLabels) {
   const sev = p.severity ?? 1;
-  const label = escapeHtml(`${p.kind === "rough" ? "rough road" : p.kind} on ${p.street}, ${p.status === "repaired" ? "appears repaired" : `severity ${sev}, ${SEV_WORD[sev]}`}`);
+  const label = escapeHtml(`${labels.hazard[p.kind] ?? p.kind} · ${p.street} · ${p.status === "repaired" ? labels.repaired : `${sev} · ${labels.sev[sev]}`}`);
   return L.divIcon({
     className: "pin-wrap",
     html: `<button type="button" class="pin${selected ? " pin--selected" : ""}${p.status === "repaired" ? " pin--repaired" : ""}" style="--pin-color:var(--sev-${sev});--pin-text:${sev <= 2 ? "var(--ink)" : "#fff"}" aria-label="${label}"><span class="pin-dot" aria-hidden="true">${p.status === "repaired" ? "✓" : sev}</span></button>`,
@@ -30,7 +33,7 @@ function pinIcon(p: Pothole, selected: boolean) {
   });
 }
 
-export default function MapView({ potholes, tracks, selectedId, onSelect, city, onSelectCity, mission }: Props) {
+export default function MapView({ labels, potholes, tracks, selectedId, onSelect, city, onSelectCity, mission }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const cluster = useRef<L.MarkerClusterGroup | null>(null);
@@ -59,7 +62,7 @@ export default function MapView({ potholes, tracks, selectedId, onSelect, city, 
       showCoverageOnHover: false, maxClusterRadius: 46,
       iconCreateFunction: (c) => {
         const n = c.getChildCount();
-        return L.divIcon({ className: "cluster-wrap", html: `<div class="cluster" role="img" aria-label="${n} potholes, click to zoom in">${n}</div>`, iconSize: [42, 42] });
+        return L.divIcon({ className: "cluster-wrap", html: `<div class="cluster" role="img" aria-label="${n}">${n}</div>`, iconSize: [42, 42] });
       },
     });
     m.addLayer(group);
@@ -68,7 +71,7 @@ export default function MapView({ potholes, tracks, selectedId, onSelect, city, 
     trackLayer.current = L.layerGroup().addTo(m);
     const cityGroup = L.markerClusterGroup({
       showCoverageOnHover: false, maxClusterRadius: 60,
-      iconCreateFunction: (c) => L.divIcon({ className: "cluster-wrap", html: `<div class="cluster cluster--city" role="img" aria-label="${c.getChildCount()} 311 reports without photos, click to zoom in">${c.getChildCount()}</div>`, iconSize: [42, 42] }),
+      iconCreateFunction: (c) => L.divIcon({ className: "cluster-wrap", html: `<div class="cluster cluster--city" role="img" aria-label="311: ${c.getChildCount()}">${c.getChildCount()}</div>`, iconSize: [42, 42] }),
     });
     m.addLayer(cityGroup);
     cityCluster.current = cityGroup;
@@ -86,7 +89,7 @@ export default function MapView({ potholes, tracks, selectedId, onSelect, city, 
     if (!group || !m) return;
     group.clearLayers(); markers.current.clear();
     const list = potholes.map((p) => {
-      const marker = L.marker([p.lat, p.lng], { icon: pinIcon(p, false), keyboard: false, alt: "" });
+      const marker = L.marker([p.lat, p.lng], { icon: pinIcon(p, false, labels), keyboard: false, alt: "" });
       marker.on("click", () => onSelectRef.current(p.id));
       markers.current.set(p.id, { marker, data: p });
       return marker;
@@ -96,14 +99,14 @@ export default function MapView({ potholes, tracks, selectedId, onSelect, city, 
       m.fitBounds(L.latLngBounds(potholes.map((p) => [p.lat, p.lng] as L.LatLngTuple)), { padding: [60, 60], maxZoom: 13 });
       fitted.current = true;
     }
-  }, [potholes]);
+  }, [potholes, labels]);
 
   useEffect(() => {
     const group = cityCluster.current;
     if (!group) return;
     group.clearLayers();
-    group.addLayers(city.map((r) => L.marker([r.lat, r.lng], { icon: cityIcon(r), keyboard: false, alt: "" }).on("click", () => onCityRef.current(r.id))));
-  }, [city]);
+    group.addLayers(city.map((r) => L.marker([r.lat, r.lng], { icon: cityIcon(r, labels), keyboard: false, alt: "" }).on("click", () => onCityRef.current(r.id))));
+  }, [city, labels]);
 
   // the suggested photo route: a dashed line through numbered stops
   useEffect(() => {
@@ -131,16 +134,16 @@ export default function MapView({ potholes, tracks, selectedId, onSelect, city, 
 
   useEffect(() => {
     const prev = prevSelected.current ? markers.current.get(prevSelected.current) : null;
-    if (prev) prev.marker.setIcon(pinIcon(prev.data, false));
+    if (prev) prev.marker.setIcon(pinIcon(prev.data, false, labels));
     const cur = selectedId ? markers.current.get(selectedId) : null;
     if (cur && cluster.current) {
       cluster.current.zoomToShowLayer(cur.marker, () => {
-        cur.marker.setIcon(pinIcon(cur.data, true));
+        cur.marker.setIcon(pinIcon(cur.data, true, labels));
         map.current?.panTo(cur.marker.getLatLng(), { animate: true });
       });
     }
     prevSelected.current = selectedId;
-  }, [selectedId, potholes]);
+  }, [selectedId, potholes, labels]);
 
   return <div ref={box} className="h-full w-full" />;
 }

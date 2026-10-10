@@ -1,10 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import { Hanken_Grotesk } from "next/font/google";
 import Footer from "@/components/ui/Footer";
+import LanguageGate from "@/components/ui/LanguageGate";
 import Nav from "@/components/ui/Nav";
+import { I18nProvider } from "@/lib/i18n/client";
+import { dictFor, RTL } from "@/lib/i18n";
+import { getLang } from "@/lib/i18n/server";
+import { LANGS } from "@/lib/voice";
 import "./globals.css";
 
-const hanken = Hanken_Grotesk({ subsets: ["latin"], variable: "--font-hanken" });
+// Latin, plus the scripts the site is translated into where this typeface has them; other scripts use system fonts.
+const hanken = Hanken_Grotesk({ subsets: ["latin", "latin-ext", "cyrillic-ext", "vietnamese"], variable: "--font-hanken" });
 
 export const metadata: Metadata = {
   title: "spotholes: ride, and the city remembers",
@@ -12,13 +18,17 @@ export const metadata: Metadata = {
 };
 export const viewport: Viewport = { themeColor: "#fafaf7", viewportFit: "cover" };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const { lang, chosen } = await getLang();
   return (
-    <html lang="en" className={hanken.variable}>
+    <html lang={LANGS[lang].bcp47} dir={RTL.has(lang) ? "rtl" : "ltr"} className={hanken.variable}>
       <body>
-        <Nav />
-        <main>{children}</main>
-        <Footer />
+        <I18nProvider dict={dictFor(lang)} lang={lang}>
+          <Nav />
+          <main>{children}</main>
+          <Footer />
+          <LanguageGate firstVisit={!chosen} />
+        </I18nProvider>
       </body>
     </html>
   );

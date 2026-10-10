@@ -19,6 +19,9 @@ Read `node_modules/next/dist/docs/` before using Next APIs: this version differs
   always labeled "reported to 311, no photo yet". They are never counted or styled as rider-verified hazards.
 - Local dev uses an embedded database and local photo files (`USE_LOCAL_DB=1`), so tests never touch live data. Don't test
   against production by creating hazards; use refusal paths or the local database.
+- All interface text lives in `src/lib/i18n/en.ts`; never hard-code visible strings in components. After changing it, run
+  `node scripts/translate.mjs` to refresh the nine other languages (machine-translated; flag for native review). Use
+  logical CSS (`ms-`/`me-`/`ps-`/`pe-`/`start-`/`end-`/`text-start`) so Arabic's right-to-left layout keeps working.
 - Never put an API key or secret in browser code. Never commit `.env*`.
 - Use design tokens; no hard-coded colors. Respect `prefers-reduced-motion`. Status/severity are text, not just color.
 - Safety: the ride screen must tell riders to mount the phone before moving and never to handle it while moving.

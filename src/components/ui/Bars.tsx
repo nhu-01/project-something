@@ -1,13 +1,14 @@
 import type { Stats } from "@/lib/data/types";
+import type { T } from "@/lib/i18n";
 
 // 14-day found vs repaired chart. Pure SVG, readable without color (the legend and values are text).
-export default function Bars({ data }: { data: Stats["daily"] }) {
+export default function Bars({ data, t }: { data: Stats["daily"]; t: T }) {
   const max = Math.max(1, ...data.map((d) => Math.max(d.found, d.repaired)));
   const W = 700, H = 200, pad = 24, bw = (W - pad * 2) / data.length;
   return (
-    <figure>
-      <svg viewBox={`0 0 ${W} ${H + 28}`} className="h-auto w-full" role="img" aria-label={`Potholes found and repaired per day over the last 14 days. Most in a day: ${max}.`}>
-        {[0.5, 1].map((t) => <line key={t} x1={pad} x2={W - pad} y1={H - t * (H - 20)} y2={H - t * (H - 20)} stroke="var(--line)" />)}
+    <figure dir="ltr">
+      <svg viewBox={`0 0 ${W} ${H + 28}`} className="h-auto w-full" role="img" aria-label={t("progress.chartAlt", { n: max })}>
+        {[0.5, 1].map((y) => <line key={y} x1={pad} x2={W - pad} y1={H - y * (H - 20)} y2={H - y * (H - 20)} stroke="var(--line)" />)}
         {data.map((d, i) => {
           const x = pad + i * bw;
           const h1 = (d.found / max) * (H - 20), h2 = (d.repaired / max) * (H - 20);
@@ -20,7 +21,7 @@ export default function Bars({ data }: { data: Stats["daily"] }) {
           );
         })}
       </svg>
-      <figcaption className="mt-2 flex gap-5 text-sm text-muted"><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-ink" />found</span><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-repaired" />repaired</span></figcaption>
+      <figcaption className="mt-2 flex gap-5 text-sm text-muted"><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-ink" />{t("progress.found")}</span><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-repaired" />{t("progress.repaired")}</span></figcaption>
     </figure>
   );
 }

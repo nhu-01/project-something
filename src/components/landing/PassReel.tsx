@@ -6,13 +6,14 @@ import Timeline from "@/components/potholes/Timeline";
 import { SeverityMeter, StatusChip } from "@/components/ui/Severity";
 import type { Pothole } from "@/lib/data/types";
 import { fmtDate } from "@/lib/format";
-import { HAZARD_LABEL, KIND_LABEL } from "@/lib/tokens";
+import { useI18n } from "@/lib/i18n/client";
+import type { Key, T } from "@/lib/i18n";
 
 type Slide = { key: string; src: string; pothole: Pothole; sightingId?: string; caption: string };
 
 // Every kept camera frame becomes a print in a stack. The top print shuffles to the back every few seconds, and the
 // details and timeline beside it follow whichever print is on top.
-function toSlides(potholes: Pothole[]): Slide[] {
+function toSlides(potholes: Pothole[], t: T, lang: string): Slide[] {
   const seen = new Set<string>();
   const out: Slide[] = [];
   for (const p of potholes) {
@@ -20,9 +21,9 @@ function toSlides(potholes: Pothole[]): Slide[] {
     for (const s of passes) {
       if (seen.has(s.photo!)) continue;
       seen.add(s.photo!);
-      out.push({ key: `${p.id}-${s.id}`, src: s.photo!, pothole: p, sightingId: s.id, caption: `${KIND_LABEL[s.kind]} · ${fmtDate(s.at)}` });
+      out.push({ key: `${p.id}-${s.id}`, src: s.photo!, pothole: p, sightingId: s.id, caption: `${t(`kind.${s.kind}` as Key)} · ${fmtDate(s.at, lang)}` });
     }
-    if (!passes.length && p.photo && !seen.has(p.photo)) { seen.add(p.photo); out.push({ key: p.id, src: p.photo, pothole: p, caption: "from a rider's camera" }); }
+    if (!passes.length && p.photo && !seen.has(p.photo)) { seen.add(p.photo); out.push({ key: p.id, src: p.photo, pothole: p, caption: t("reel.fromCamera") }); }
   }
   return out.slice(0, 8);
 }
@@ -36,7 +37,8 @@ const POSE = [
 const HIDDEN = { y: 40, scale: 0.84, rotate: 0, opacity: 0 };
 
 export default function PassReel({ potholes }: { potholes: Pothole[] }) {
-  const slides = useMemo(() => toSlides(potholes), [potholes]);
+  const { t, lang } = useI18n();
+  const slides = useMemo(() => toSlides(potholes, t, lang), [potholes, t, lang]);
   const reduce = useReducedMotion();
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { margin: "-80px" });
@@ -73,7 +75,7 @@ export default function PassReel({ potholes }: { potholes: Pothole[] }) {
               <motion.button
                 key={s.key} type="button" tabIndex={pos === 0 ? 0 : -1} aria-hidden={pos !== 0}
                 onClick={() => setActive((v) => (v + 1) % n)}
-                aria-label={n > 1 ? `photo ${active + 1} of ${n}: ${HAZARD_LABEL[s.pothole.kind]} on ${s.pothole.street}. show the next photo` : `${HAZARD_LABEL[s.pothole.kind]} on ${s.pothole.street}`}
+                aria-label={`${t(`hazard.${s.pothole.kind}` as Key)} · ${s.pothole.street}${n > 1 ? `. ${t("reel.nextPhoto")}` : ""}`}
                 className="absolute inset-0 overflow-hidden rounded-[28px] border-[5px] border-card bg-line shadow-[0_18px_44px_rgb(32_33_30/0.18)]"
                 style={{ zIndex: n - pos, transformOrigin: "50% 100%" }}
                 initial={false}
@@ -87,9 +89,9 @@ export default function PassReel({ potholes }: { potholes: Pothole[] }) {
           })}
         </div>
         {n > 1 && (
-          <div className="mt-12 flex justify-center gap-2" role="group" aria-label="choose a photo">
+          <div className="mt-12 flex justify-center gap-2" role="group" aria-label={t("reel.choose")}>
             {slides.map((s, i) => (
-              <button key={s.key} type="button" onClick={() => setActive(i)} aria-label={`photo ${i + 1}`} aria-current={i === active || undefined} className="grid h-6 w-6 place-items-center">
+              <button key={s.key} type="button" onClick={() => setActive(i)} aria-label={t("reel.photoN", { n: i + 1 })} aria-current={i === active || undefined} className="grid h-6 w-6 place-items-center">
                 <span className={`h-2 rounded-full transition-all duration-300 ${i === active ? "w-5 bg-ink" : "w-2 bg-line"}`} />
               </button>
             ))}
@@ -98,12 +100,12 @@ export default function PassReel({ potholes }: { potholes: Pothole[] }) {
       </div>
 
       <div className="card p-6 sm:p-7" aria-live="polite">
-        <div className="flex flex-wrap items-center gap-3"><StatusChip status={p.status} /><span className="text-sm text-muted">{HAZARD_LABEL[p.kind]} · {p.street}{p.borough ? `, ${p.borough}` : ""}</span></div>
+        <div className="flex flex-wrap items-center gap-3"><StatusChip status={p.status} /><span className="text-sm text-muted">{t(`hazard.${p.kind}` as Key)} · {p.street}{p.borough ? `, ${p.borough}` : ""}</span></div>
         <div className="mt-3"><SeverityMeter value={p.severity} /></div>
         <div className="mt-6"><Timeline sightings={p.sightings.slice(-4)} activeId={cur.sightingId} /></div>
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-muted">real frames from riders&apos; cameras. each pass updates what we know.</p>
-          <Link href={`/potholes/${p.id}`} className="text-sm underline underline-offset-4">full history</Link>
+          <p className="text-sm text-muted">{t("reel.note")}</p>
+          <Link href={`/potholes/${p.id}`} className="text-sm underline underline-offset-4">{t("common.fullHistory")}</Link>
         </div>
       </div>
     </div>

@@ -1,5 +1,7 @@
 "use client";
 import { useReducedMotion } from "motion/react";
+import { useI18n } from "@/lib/i18n/client";
+import type { Key } from "@/lib/i18n";
 import { pointAt, ROUTE_D } from "./routeMath";
 
 // One looping story in a single SVG (SMIL, so it scales and stays in sync):
@@ -8,20 +10,21 @@ const CYCLE = 16;
 const R1_END = 0.4; // rider 1 occupies 0 to 40% of the cycle
 const R2_START = 0.5, R2_END = 0.9;
 const HOLES = [
-  { f: 0.16, label: "ahead · moderate" },
-  { f: 0.46, label: "ahead · serious" },
-  { f: 0.72, label: "ahead · minor" },
-  { f: 0.9, label: "ahead · moderate" },
+  { f: 0.16, sev: 3 },
+  { f: 0.46, sev: 4 },
+  { f: 0.72, sev: 1 },
+  { f: 0.9, sev: 3 },
 ];
 
 const seq = (a: number[]) => a.map((n) => n.toFixed(4)).join(";");
 
 export default function HeroScene() {
   const reduce = useReducedMotion();
+  const { t } = useI18n();
   const dur = `${CYCLE}s`;
 
   return (
-    <svg viewBox="0 0 1200 380" className="h-auto w-full" role="img" aria-label="Animated sketch: one rider passes a street and leaves potholes on the map; a second rider is warned about each one." preserveAspectRatio="xMidYMid meet">
+    <svg viewBox="0 0 1200 380" className="h-auto w-full" role="img" aria-label={t("home.heroAlt")} preserveAspectRatio="xMidYMid meet">
       <defs>
         <linearGradient id="fade" x1="0" x2="1">
           <stop offset="0" stopColor="var(--paper)" stopOpacity="1" />
@@ -47,7 +50,8 @@ export default function HeroScene() {
         const s1 = R1_END * h.f; // rider 1 reaches it
         const s2 = R2_START + (R2_END - R2_START) * h.f; // rider 2 reaches it
         const warnAt = Math.max(R2_START + 0.005, s2 - 0.055);
-        const labelW = h.label.length * 7.2 + 28;
+        const label = `${t("home.aheadLabel")} · ${t(`sev.${h.sev}` as Key)}`;
+        const labelW = [...label].length * 8.4 + 28;
         return (
           <g key={i}>
             {/* remembered pothole */}
@@ -70,7 +74,7 @@ export default function HeroScene() {
                 <g opacity="0" transform={`translate(${p.x - labelW / 2} ${p.y - 52})`}>
                   <animate attributeName="opacity" dur={dur} repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes={seq([0, warnAt, warnAt + 0.02, s2 + 0.03, s2 + 0.055, 1])} />
                   <rect width={labelW} height="30" rx="15" fill="var(--ink)" />
-                  <text x={labelW / 2} y="19.5" textAnchor="middle" fontSize="13" fill="var(--paper)" fontFamily="var(--font-hanken), sans-serif">{h.label}</text>
+                  <text x={labelW / 2} y="19.5" textAnchor="middle" fontSize="13" fill="var(--paper)" fontFamily="var(--font-hanken), sans-serif">{label}</text>
                 </g>
               </>
             )}
@@ -94,9 +98,9 @@ export default function HeroScene() {
           </g>
           {/* captions */}
           {[
-            { t: "rider one rides. the app spots what's in the road.", a: 0.01, b: R1_END },
-            { t: "rider two is warned before they see it.", a: R2_START, b: R2_END },
-            { t: "the city remembers.", a: 0.92, b: 0.995 },
+            { t: t("home.caption1"), a: 0.01, b: R1_END },
+            { t: t("home.caption2"), a: R2_START, b: R2_END },
+            { t: t("home.caption3"), a: 0.92, b: 0.995 },
           ].map((c) => (
             <text key={c.t} x="600" y="362" textAnchor="middle" fontSize="16" fill="var(--muted)" opacity="0" fontFamily="var(--font-hanken), sans-serif">
               <animate attributeName="opacity" dur={dur} repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes={seq([0, c.a, c.a + 0.02, c.b - 0.02, c.b, 1])} />
@@ -105,7 +109,7 @@ export default function HeroScene() {
           ))}
         </>
       )}
-      {reduce && <text x="600" y="362" textAnchor="middle" fontSize="16" fill="var(--muted)" fontFamily="var(--font-hanken), sans-serif">the first rider leaves it behind. the next rider is warned.</text>}
+      {reduce && <text x="600" y="362" textAnchor="middle" fontSize="16" fill="var(--muted)" fontFamily="var(--font-hanken), sans-serif">{t("home.captionStill")}</text>}
 
       <rect width="1200" height="380" fill="url(#fade)" pointerEvents="none" />
     </svg>
