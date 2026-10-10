@@ -3,6 +3,7 @@ import L from "leaflet";
 import "leaflet.markercluster";
 import { useEffect, useRef } from "react";
 import { escapeHtml } from "@/lib/escape";
+import { gradeOf } from "@/lib/tokens";
 import type { CityReport, Mission, Pothole } from "@/lib/data/types";
 
 // Text for the pins' screen-reader labels, supplied by the page in the visitor's language.
@@ -21,13 +22,13 @@ type Props = {
   centerOnMe: number; // bump to fly the map to the visitor
 };
 
-// Rider-reported hazard: a solid circle carrying its severity number.
+// Rider-reported hazard: a circle holding the road-hazard sign, with its letter grade (A mildest to E worst) on a badge.
 function riderIcon(p: Pothole, selected: boolean, labels: PinLabels) {
   const sev = p.severity ?? 1;
-  const label = escapeHtml(`${labels.hazard[p.kind] ?? p.kind} · ${p.street} · ${p.status === "repaired" ? labels.repaired : `${sev} · ${labels.sev[sev]}`}`);
+  const label = escapeHtml(`${labels.hazard[p.kind] ?? p.kind} · ${p.street} · ${p.status === "repaired" ? labels.repaired : `${gradeOf(sev)} · ${labels.sev[sev]}`}`);
   return L.divIcon({
     className: "pin-wrap",
-    html: `<button type="button" class="pin${selected ? " pin--selected" : ""}${p.status === "repaired" ? " pin--repaired" : ""}" style="--pin-color:var(--sev-${sev});--pin-text:${sev <= 2 ? "var(--ink)" : "#fff"}" aria-label="${label}"><span class="pin-dot" aria-hidden="true">${p.status === "repaired" ? "✓" : sev}</span></button>`,
+    html: `<button type="button" class="pin${selected ? " pin--selected" : ""}${p.status === "repaired" ? " pin--repaired" : ""}" style="--pin-color:var(--sev-${sev});--pin-text:${sev <= 2 ? "var(--ink)" : "#fff"}" aria-label="${label}"><span class="pin-dot" aria-hidden="true"><img src="/pothole-sign.png" alt="" width="26" height="26" /></span><span class="pin-grade" aria-hidden="true">${p.status === "repaired" ? "✓" : gradeOf(sev)}</span></button>`,
     iconSize: [44, 44], iconAnchor: [22, 22],
   });
 }
@@ -40,7 +41,7 @@ function cityIcon(r: CityReport, selected: boolean, labels: PinLabels) {
   const badge = photographed ? `<span class="pin-count" aria-hidden="true">${r.photoCount}</span>` : "";
   return L.divIcon({
     className: "pin-wrap",
-    html: `<button type="button" class="pin pin--city${photographed ? " pin--city-photo" : ""}${selected ? " pin--selected" : ""}" aria-label="${label}"><span class="pin-dot" aria-hidden="true">311</span>${badge}</button>`,
+    html: `<button type="button" class="pin pin--city${photographed ? " pin--city-photo" : ""}${selected ? " pin--selected" : ""}" aria-label="${label}"><span class="pin-dot" aria-hidden="true"><img src="/pothole-sign.png" alt="" width="24" height="24" /></span>${badge}</button>`,
     iconSize: [44, 44], iconAnchor: [22, 22],
   });
 }

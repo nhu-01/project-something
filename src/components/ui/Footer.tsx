@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getT } from "@/lib/i18n/server";
 import LanguageButton from "./LanguageButton";
 
@@ -13,7 +12,6 @@ export default async function Footer() {
       <div className="wrap flex flex-col gap-1 pb-8 pt-2 text-sm text-muted sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <span>{t("footer.independent")}</span>
         <span className="flex flex-wrap items-center gap-x-4">
-          <Link href="/report" className="tap underline underline-offset-4">{t("footer.reportLink")}</Link>
           <LanguageButton className="tap underline underline-offset-4" />
         </span>
         <span className="basis-full">{t("footer.notes")}</span>

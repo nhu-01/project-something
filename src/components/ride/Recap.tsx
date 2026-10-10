@@ -6,6 +6,7 @@ import Reveal from "@/components/ui/Reveal";
 import { ArrowUpRight } from "@/components/ui/Icons";
 import { useI18n } from "@/lib/i18n/client";
 import { plural, type Key } from "@/lib/i18n";
+import { GRADE } from "@/lib/tokens";
 import type { RideEvent } from "./types";
 
 export default function Recap({ events, seconds, onAgain }: { events: RideEvent[]; seconds: number; onAgain: () => void }) {
@@ -43,7 +44,7 @@ export default function Recap({ events, seconds, onAgain }: { events: RideEvent[
                       <img src={e.shot} alt="" className="h-full w-full object-cover" />
                     </button>
                   )}
-                  <div className="min-w-0 flex-1"><p className="font-medium">{t(`hazard.${e.hazard}` as Key)} · {e.street}</p><p className="text-sm text-muted">{e.lane}{e.severity ? ` · ${t(`sev.${e.severity}` as Key)}` : ""}</p></div>
+                  <div className="min-w-0 flex-1"><p className="font-medium">{t(`hazard.${e.hazard}` as Key)} · {e.street}</p><p className="text-sm text-muted">{e.lane}{e.severity ? ` · ${t("common.severityN", { n: GRADE[e.severity], word: t(`sev.${e.severity}` as Key) })}` : ""}</p></div>
                   <span className="rounded-full border border-line px-3 py-1 text-sm">{kindLabel(e.kind)}</span>
                 </li>
               ))}

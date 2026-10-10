@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SpotButton } from "@/components/ride/SpotActions";
 import HeroScene from "@/components/landing/HeroScene";
 import ScrollFillText from "@/components/motion/ScrollFillText";
 import SplitReveal from "@/components/motion/SplitReveal";
@@ -23,8 +24,6 @@ export default async function Home() {
     { text: t("home.swap.potholes"), color: "var(--line-red)" },
     { text: t("home.swap.bumps"), color: "var(--line-orange)" },
     { text: t("home.swap.rough"), color: "var(--line-yellow)" },
-    { text: t("home.swap.pavers"), color: "var(--line-blue)" },
-    { text: t("home.swap.covers"), color: "var(--line-purple)" },
   ];
   return (
     <>
@@ -39,10 +38,9 @@ export default async function Home() {
           </Reveal>
           <Reveal delay={0.7}>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-              <Link href="/ride" className="pill pill-ink">{t("nav.start")} <ArrowUpRight /></Link>
+              <SpotButton className="pill pill-ink">{t("nav.start")} <ArrowUpRight /></SpotButton>
               <Link href="/map" className="pill pill-line">{t("home.seeMap")} <ArrowUpRight /></Link>
             </div>
-            <p className="mt-4 text-sm text-muted">{t("home.notRiding")} <Link href="/report" className="tap underline underline-offset-4">{t("footer.reportLink")}</Link></p>
           </Reveal>
         </div>
         {/* the route sketch always reads left to right */}
@@ -56,7 +54,7 @@ export default async function Home() {
         <Reveal>
           <ScrollFillText text={t("home.closing")} className="h2 mx-auto max-w-[20ch]" />
           <div className="mt-8 flex justify-center gap-3">
-            <Link href="/ride" className="pill pill-ink">{t("nav.start")} <ArrowUpRight /></Link>
+            <SpotButton className="pill pill-ink">{t("nav.start")} <ArrowUpRight /></SpotButton>
             <Link href="/stats" className="pill pill-line">{t("home.seeProgress")}</Link>
           </div>
         </Reveal>

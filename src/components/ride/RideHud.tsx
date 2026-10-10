@@ -5,7 +5,7 @@ import { Flashlight, Pause, Volume } from "@/components/ui/Icons";
 import Snapshot from "./Snapshot";
 import { useI18n } from "@/lib/i18n/client";
 import type { Key } from "@/lib/i18n";
-import { SEV_DARK_TEXT, SEV_VAR } from "@/lib/tokens";
+import { GRADE, SEV_DARK_TEXT, SEV_VAR } from "@/lib/tokens";
 import type { GpsState, RideEvent } from "./types";
 
 function useElapsed(running: boolean) {
@@ -52,7 +52,7 @@ export default function RideHud({ gps, online, last, events, children, notice, p
               transition={{ duration: 0.45, delay: reduce ? 0 : 1.45, ease: [0.16, 1, 0.3, 1], layout: { duration: 0.45, delay: reduce ? 0 : 1.45 } }}
               className="relative w-[58px] overflow-hidden rounded-[14px] border-2 border-paper shadow-[0_6px_18px_rgb(0_0_0/0.4)]" style={{ aspectRatio: e.shotAspect ?? 0.5625 }}>
               <img src={e.shot} alt={`${t(`hazard.${e.hazard}` as Key)} · ${e.street}`} className="h-full w-full object-cover" />
-              {e.severity && <span className="absolute bottom-1 left-1 grid h-5 w-5 place-items-center rounded-full text-[11px] font-bold" style={{ background: SEV_VAR[e.severity], color: SEV_DARK_TEXT[e.severity] ? "var(--ink)" : "#fff" }} aria-hidden>{e.severity}</span>}
+              {e.severity && <span className="absolute bottom-1 left-1 grid h-5 w-5 place-items-center rounded-full text-[11px] font-bold" style={{ background: SEV_VAR[e.severity], color: SEV_DARK_TEXT[e.severity] ? "var(--ink)" : "#fff" }} aria-hidden>{GRADE[e.severity]}</span>}
             </motion.li>
           ))}
         </AnimatePresence>

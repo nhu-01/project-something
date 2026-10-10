@@ -115,13 +115,15 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
 .map-shell .leaflet-control-attribution { font-size: 10px; background: color-mix(in srgb, var(--paper) 80%, transparent); }
 .pin-wrap, .cluster-wrap { background: none; border: 0; }
 .pin { position: relative; display: grid; width: 44px; height: 44px; place-items: center; border: 0; background: none; cursor: pointer; }
-.pin-dot { display: grid; place-items: center; border-radius: 9999px; background: var(--pin-color); color: var(--pin-text, #fff); font-size: 13px; font-weight: 700; line-height: 1; border: 2px solid var(--paper); box-shadow: 0 4px 10px rgb(32 33 30 / 0.22); width: 28px; height: 28px; transition: transform 180ms var(--ease); }
+.pin-dot { display: grid; place-items: center; border-radius: 9999px; background: var(--paper); color: var(--ink); font-size: 13px; font-weight: 700; line-height: 1; border: 2px solid var(--pin-color); box-shadow: 0 4px 10px rgb(32 33 30 / 0.22); width: 28px; height: 28px; transition: transform 180ms var(--ease); }
+.pin-dot img { display: block; }
+.pin-grade { position: absolute; right: 0; bottom: 3px; display: grid; min-width: 19px; height: 19px; place-items: center; border-radius: 9999px; background: var(--pin-color); color: var(--pin-text, #fff); font-size: 11px; font-weight: 800; border: 2px solid var(--paper); line-height: 1; }
 .pin:hover .pin-dot { transform: scale(1.18); }
 .pin--selected .pin-dot { box-shadow: 0 0 0 2px var(--ink), 0 6px 14px rgb(32 33 30 / 0.3); transform: scale(1.2); }
 .pin--repaired .pin-dot { background: var(--paper); color: var(--repaired); border-color: var(--repaired); }
 /* 311 reports are rounded squares (rider reports are circles); hollow and dashed until a photo exists, then solid. */
-.pin--city .pin-dot { width: 30px; height: 30px; border-radius: 9px; background: var(--paper); color: var(--ink); border: 2px dashed var(--ink); box-shadow: none; font-size: 10px; }
-.pin--city-photo .pin-dot { background: var(--ink); color: var(--paper); border: 2px solid var(--paper); box-shadow: 0 0 0 1.5px var(--ink), 0 4px 10px rgb(32 33 30 / 0.25); }
+.pin--city .pin-dot { width: 34px; height: 34px; border-radius: 10px; background: var(--paper); color: var(--ink); border: 2px dashed var(--ink); box-shadow: none; font-size: 10px; }
+.pin--city-photo .pin-dot { background: var(--paper); color: var(--ink); border: 2px solid var(--ink); box-shadow: 0 0 0 1.5px var(--ink), 0 4px 10px rgb(32 33 30 / 0.25); }
 .pin--city.pin--selected .pin-dot { transform: scale(1.2); box-shadow: 0 0 0 2px var(--ink), 0 6px 14px rgb(32 33 30 / 0.3); }
 .pin-count { position: absolute; top: 3px; right: 1px; display: grid; min-width: 18px; height: 18px; place-items: center; border-radius: 9999px; background: var(--line-blue); color: #fff; font-size: 11px; font-weight: 700; border: 2px solid var(--paper); padding: 0 3px; line-height: 1; }
 .key-glyph { display: inline-block; width: 14px; height: 14px; flex: none; }
@@ -139,6 +141,7 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
 
 /* ride mini-map pins: same shapes as the main map (circle = rider, rounded square = 311), kept small */
 .ride-pin { display: grid; width: 26px; height: 26px; place-items: center; border: 2px solid var(--paper); font-size: 10px; font-weight: 700; color: var(--paper); }
-.ride-pin--rider { border-radius: 9999px; background: var(--ink); }
-.ride-pin--city { border-radius: 8px; background: var(--line-blue); opacity: 0.8; }
-.ride-pin--target { border-radius: 8px; width: 34px; height: 34px; background: var(--ink); box-shadow: 0 0 0 4px var(--sage); }
+.ride-pin--rider { border-radius: 9999px; background: var(--paper); color: var(--ink); border-color: var(--ink); }
+.ride-pin--city, .ride-pin--target { background: var(--paper); }
+.ride-pin--city { border-radius: 8px; border-color: var(--ink); opacity: 0.85; }
+.ride-pin--target { border-radius: 10px; width: 36px; height: 36px; border-color: var(--ink); box-shadow: 0 0 0 4px var(--taxi); }

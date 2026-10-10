@@ -1,5 +1,6 @@
 "use client";
 import type { Sighting } from "@/lib/data/types";
+import { gradeOf } from "@/lib/tokens";
 import { useI18n } from "@/lib/i18n/client";
 import type { Key } from "@/lib/i18n";
 import { fmtDate, fmtTime } from "@/lib/format";
@@ -21,7 +22,7 @@ export default function Timeline({ sightings, activeId }: { sightings: Sighting[
             </span>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="font-medium">{t(`kind.${s.kind}` as Key)}</span>
-              {s.severity && <span className="text-sm text-muted">{t("common.severityN", { n: s.severity, word: t(`sev.${s.severity}` as Key) })}</span>}
+              {s.severity && <span className="text-sm text-muted">{t("common.severityN", { n: gradeOf(s.severity), word: t(`sev.${s.severity}` as Key) })}</span>}
               <span className="text-sm text-muted">{fmtDate(s.at, lang)}, {fmtTime(s.at, lang)} · {t("common.rider", { id: s.rider })}</span>
             </div>
             <p className="mt-0.5 text-[15px] text-muted" dir="auto">{s.note}</p>

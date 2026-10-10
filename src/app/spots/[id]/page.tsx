@@ -1,4 +1,7 @@
 import Link from "next/link";
+import StreetPhotos from "@/components/photos/StreetPhotos";
+import { PhotographSpot } from "@/components/ride/SpotActions";
+import { gradeOf } from "@/lib/tokens";
 import { notFound } from "next/navigation";
 import { streetViewUrl } from "@/components/map/CityPanels";
 import CityGallery from "@/components/photos/CityGallery";
@@ -44,8 +47,7 @@ export default async function SpotPage({ params }: { params: Promise<{ id: strin
             <div className="grid min-h-[220px] place-items-center rounded-3xl border border-dashed border-line bg-card p-8 text-center text-muted">{t("spot.noPhotos")}</div>
           )}
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/ride" className="pill pill-ink">{t("city.photograph")}</Link>
-            <Link href="/report" className="pill pill-line">{t("city.reportByPhoto")}</Link>
+            <PhotographSpot spot={{ id: r.id, lat: r.lat, lng: r.lng, place: r.place }} className="pill pill-ink">{t("city.photograph")}</PhotographSpot>
           </div>
         </Reveal>
 
@@ -55,6 +57,7 @@ export default async function SpotPage({ params }: { params: Promise<{ id: strin
             {facts.map(([k, v]) => (<div key={k} className="flex justify-between gap-4 px-5 py-3"><dt className="text-muted">{k}</dt><dd className="text-end font-medium">{v}</dd></div>))}
           </dl>
           <p className="text-sm text-muted">{t("spot.disclaimer")}</p>
+          <StreetPhotos spotId={r.id} />
           <div className="flex flex-wrap gap-x-5">
             <a className="tap text-sm underline underline-offset-4" href={streetViewUrl(r.lat, r.lng)} target="_blank" rel="noopener noreferrer">{t("city.streetView")}</a>
             <a className="tap text-sm underline underline-offset-4" href="https://portal.311.nyc.gov/">{t("pothole.report311")}</a>
@@ -74,7 +77,7 @@ export default async function SpotPage({ params }: { params: Promise<{ id: strin
                   </span>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <span className="font-medium">{p.present ? t("spot.seen") : t("spot.notFound")}</span>
-                    {p.severity && <span className="text-sm text-muted">{t("common.severityN", { n: p.severity, word: t(`sev.${p.severity}` as Key) })}</span>}
+                    {p.severity && <span className="text-sm text-muted">{t("common.severityN", { n: gradeOf(p.severity), word: t(`sev.${p.severity}` as Key) })}</span>}
                     <span className="text-sm text-muted">{fmtDate(p.at, lang)}, {fmtTime(p.at, lang)}{p.rider ? ` · ${t("common.rider", { id: p.rider })}` : ""}</span>
                   </div>
                   {p.note && <p className="mt-0.5 text-[15px] text-muted" dir="auto">{p.note}</p>}

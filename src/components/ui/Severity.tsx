@@ -2,6 +2,7 @@
 import type { Severity as Sev, Status } from "@/lib/data/types";
 import { useI18n } from "@/lib/i18n/client";
 import type { Key } from "@/lib/i18n";
+import { GRADE } from "@/lib/tokens";
 import { SeverityBullet } from "./Bullet";
 
 export function SeverityMeter({ value }: { value: Sev | null }) {
@@ -10,7 +11,7 @@ export function SeverityMeter({ value }: { value: Sev | null }) {
   return (
     <span className="inline-flex items-center gap-3">
       <SeverityBullet value={value} />
-      <span className="text-sm font-medium" aria-hidden>{t("common.sevOf", { word: t(`sev.${value}` as Key), n: value })}</span>
+      <span className="text-sm font-medium" aria-hidden>{t("common.sevOf", { word: t(`sev.${value}` as Key), n: GRADE[value] })}</span>
     </span>
   );
 }

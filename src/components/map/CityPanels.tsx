@@ -1,5 +1,6 @@
 "use client";
 import { motion, useReducedMotion } from "motion/react";
+import StreetPhotos from "@/components/photos/StreetPhotos";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import CityGallery from "@/components/photos/CityGallery";
@@ -75,6 +76,7 @@ export function CitySheet({ report, onClose, onGo, onPlan, planning }: { report:
           <button onClick={onPlan} disabled={planning} className="tap underline underline-offset-4 disabled:opacity-60">{planning ? t("map.finding") : t("city.plan")}</button>
           <a href={streetViewUrl(report.lat, report.lng)} target="_blank" rel="noopener noreferrer" className="tap underline underline-offset-4">{t("city.streetView")}</a>
         </div>
+        <StreetPhotos spotId={report.id} compact />
         <p className="text-xs text-muted">{t("city.source", { days: daysAgo(report.createdAt) })}</p>
       </div>
     </Shell>

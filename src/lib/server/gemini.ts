@@ -18,15 +18,16 @@ export const Verdict = z.object({
 export type Verdict = z.infer<typeof Verdict>;
 
 const RUBRIC = `You check one frame from a bike/scooter/dash-mounted or handheld phone camera in New York City for road surface
-hazards: anything in the pavement that could jolt or throw a bike, scooter or wheelchair.
+hazards: anything in the paved ROAD that could jolt or throw a bike, scooter or wheelchair. Only the roadway counts:
+streets and bike lanes. Sidewalks, plazas, paths, curbs, brick or paver surfaces, grass and indoor floors are not roads.
 Return ONLY a JSON object with exactly these keys:
 pothole_present (bool: true when ANY such hazard is visible, not only a classic pothole),
-hazard_type (pothole = a hole or missing chunk of the surface, including a missing or sunken brick or paver | bump = a raised or sunken spot such as a heave, ridge,
-  sunken or raised utility cover, or a lip between slabs | rough = cracked, broken, crumbling or badly uneven pavement |
+hazard_type (pothole = a hole or missing chunk of the road surface | bump = a raised or sunken spot in the road such as a heave, ridge,
+  sunken or raised utility cover, or a lip between slabs | rough = cracked, broken, crumbling or badly uneven road surface |
   none), repair_patch_visible (bool: a fresh asphalt patch where a pothole would be),
 severity (int 1-5, or null if no hazard), size (small | medium | large | null),
 lane (right lane | right lane, near curb | center lane | left lane | bike lane | crosswalk | intersection | sidewalk | unknown lane),
-road_type (street | sidewalk_or_path = sidewalks, plazas, greenways, bike or foot paths, including brick and paver
+road_type (street = the roadway or a painted bike lane on it | sidewalk_or_path = sidewalks, plazas, greenways, bike or foot paths, including brick and paver
   surfaces | highway_or_ramp | bridge_or_tunnel | not_a_road = indoors, grass, or no walkable/rideable surface),
 people_or_plates (bool: identifiable faces or readable license plates in frame),
 screen_or_print (bool: the camera is pointed at a picture rather than a real road: a phone, laptop, TV or monitor screen,

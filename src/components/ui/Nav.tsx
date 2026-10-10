@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getT } from "@/lib/i18n/server";
+import { SpotButton } from "@/components/ride/SpotActions";
 import LanguageButton from "./LanguageButton";
 
 export default async function Nav() {
@@ -15,10 +16,8 @@ export default async function Nav() {
         </Link>
         <div className="flex items-center gap-1 text-[15px]">
           <Link href="/map" className="rounded-full px-3 py-2 text-muted transition-colors hover:text-ink">{t("nav.map")}</Link>
-          <Link href="/report" className="hidden rounded-full px-3 py-2 text-muted transition-colors hover:text-ink sm:block">{t("nav.report")}</Link>
-          <Link href="/stats" className="hidden rounded-full px-3 py-2 text-muted transition-colors hover:text-ink sm:block">{t("nav.progress")}</Link>
           <LanguageButton className="hidden rounded-full px-3 py-2 text-muted transition-colors hover:text-ink min-[420px]:block" />
-          <Link href="/ride" className="pill pill-ink ms-2 !min-h-10 !px-4 whitespace-nowrap text-sm">{t("nav.start")}</Link>
+          <SpotButton className="pill pill-ink ms-2 !min-h-10 !px-4 whitespace-nowrap text-sm">{t("nav.start")}</SpotButton>
         </div>
       </nav>
     </header>
