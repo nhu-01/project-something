@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { SpotButton } from "@/components/ride/SpotActions";
-import HeroScene from "@/components/landing/HeroScene";
 import ScrollFillText from "@/components/motion/ScrollFillText";
 import SplitReveal from "@/components/motion/SplitReveal";
 import Ticker from "@/components/motion/Ticker";
@@ -43,12 +42,11 @@ export default async function Home() {
             </div>
           </Reveal>
         </div>
-        {/* the route sketch always reads left to right */}
-        <div className="mx-auto mt-10 max-w-[1100px] sm:mt-14" dir="ltr"><HeroScene /></div>
       </section>
+      {/* auto-swapping photos of one spot, right under the slogan */}
+      {stories.length > 0 && <OnePothole potholes={stories} t={t} className="mt-12 sm:mt-16" />}
       <Ticker potholes={potholes} t={t} lang={lang} />
       <Steps t={t} />
-      {stories.length > 0 && <OnePothole potholes={stories} t={t} />}
       <StatsStrip stats={stats} t={t} />
       <section className="wrap mt-28 text-center">
         <Reveal>
