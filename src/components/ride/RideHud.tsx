@@ -15,6 +15,7 @@ function useElapsed(running: boolean) {
 }
 
 type Props = {
+  demo?: boolean;
   gps: GpsState;
   online: boolean;
   last: RideEvent | null;
@@ -31,7 +32,7 @@ type Props = {
   onEnd: () => void;
 };
 
-export default function RideHud({ gps, online, last, events, children, notice, paused, voiceOn, torch, onToggleTorch, count, onTogglePause, onToggleVoice, onEnd }: Props) {
+export default function RideHud({ demo = false, gps, online, last, events, children, notice, paused, voiceOn, torch, onToggleTorch, count, onTogglePause, onToggleVoice, onEnd }: Props) {
   const reduce = useReducedMotion();
   const { t } = useI18n();
   const elapsed = useElapsed(!paused);
@@ -72,6 +73,7 @@ export default function RideHud({ gps, online, last, events, children, notice, p
         </div>
       </div>
 
+      {demo && <p className="absolute inset-x-0 flex justify-center" style={{ top: "calc(env(safe-area-inset-top) + 60px)" }}><span className="rounded-full bg-taxi px-3 py-1 text-xs font-medium text-ink">{t("demo.banner")}</span></p>}
       {children}
 
       {/* warning + result */}
@@ -80,8 +82,13 @@ export default function RideHud({ gps, online, last, events, children, notice, p
           {notice ? (
             <motion.div key={notice} {...rise} role="status" className="max-w-md rounded-full bg-paper/95 px-5 py-3 text-center text-[15px] text-ink backdrop-blur">{notice}</motion.div>
           ) : last ? (
-            <motion.div key={last.id} {...rise} role="status" className="rounded-full bg-paper/95 px-5 py-3 text-[15px] text-ink backdrop-blur">
-              <span className="mr-2 inline-block h-2 w-2 rounded-full bg-moss align-middle" aria-hidden />{t(`hud.result.${last.kind}` as Key)}
+            <motion.div key={last.id} {...rise} role="status" className="rounded-[28px] bg-paper/95 px-5 py-3 text-[15px] text-ink backdrop-blur">
+              {last.severity ? (
+                <span className="flex items-center gap-3">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-base font-bold" style={{ background: SEV_VAR[last.severity], color: SEV_DARK_TEXT[last.severity] ? "var(--ink)" : "#fff" }} aria-hidden>{GRADE[last.severity]}</span>
+                  <span className="text-start"><span className="block">{t(`hud.result.${last.kind}` as Key)}</span><span className="block text-xs text-muted">{t("common.severityN", { n: GRADE[last.severity], word: t(`sev.${last.severity}` as Key) })}</span></span>
+                </span>
+              ) : (<><span className="mr-2 inline-block h-2 w-2 rounded-full bg-moss align-middle" aria-hidden />{t(`hud.result.${last.kind}` as Key)}</>)}
             </motion.div>
           ) : null}
         </AnimatePresence>

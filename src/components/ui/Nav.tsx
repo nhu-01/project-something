@@ -16,7 +16,7 @@ export default async function Nav() {
         </Link>
         <div className="flex items-center gap-1 text-[15px]">
           <Link href="/map" className="rounded-full px-3 py-2 text-muted transition-colors hover:text-ink">{t("nav.map")}</Link>
-          <LanguageButton className="hidden rounded-full px-3 py-2 text-muted transition-colors hover:text-ink min-[420px]:block" />
+          <LanguageButton className="rounded-full px-2 py-2 text-sm text-muted transition-colors hover:text-ink sm:px-3 sm:text-[15px]" />
           <SpotButton className="pill pill-ink ms-2 !min-h-10 !px-4 whitespace-nowrap text-sm">{t("nav.start")}</SpotButton>
         </div>
       </nav>

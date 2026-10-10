@@ -5,30 +5,29 @@ import { useState } from "react";
 import { ArrowUpRight, Close, Volume } from "@/components/ui/Icons";
 import { useI18n } from "@/lib/i18n/client";
 import type { Key } from "@/lib/i18n";
-import { LANG_CODES, LANGS, type Lang } from "@/lib/voice";
 import Destination, { type PlannedRoute } from "./Destination";
 
 const CHECKS = ["ride.check1", "ride.check2", "ride.check3"] as const;
 
 type Props = {
   onStart: () => void;
-  lang: Lang; onLang: (l: Lang) => void;
+  demo?: boolean;
   voice: "f" | "m"; onVoice: (v: "f" | "m") => void;
   onHearGuide: () => void;
   onRoute: (route: PlannedRoute | null) => void;
 };
 
 // Setup, shown as a pop-up over the live camera: destination search on top, safety checks and voice choices below.
-export default function SafetyIntro({ onStart, lang, onLang, voice, onVoice, onHearGuide, onRoute }: Props) {
+export default function SafetyIntro({ onStart, demo = false, voice, onVoice, onHearGuide, onRoute }: Props) {
   const reduce = useReducedMotion();
   const { t } = useI18n();
   const [checked, setChecked] = useState<boolean[]>(CHECKS.map(() => false));
-  const ready = checked.every(Boolean);
+  const ready = demo || checked.every(Boolean);
   return (
     <div className="absolute inset-0 flex flex-col justify-between gap-3 p-3" style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)", paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}>
       <div className="flex items-start gap-2">
         <Link href="/" aria-label={t("ride.leave")} className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-paper text-ink"><Close /></Link>
-        <div className="min-w-0 flex-1"><Destination compact onRoute={onRoute} /></div>
+        <div className="min-w-0 flex-1">{demo ? <p className="rounded-full bg-taxi px-4 py-3 text-sm font-medium text-ink">{t("demo.tag")}</p> : <Destination compact onRoute={onRoute} />}</div>
       </div>
 
       <motion.section
@@ -40,10 +39,10 @@ export default function SafetyIntro({ onStart, lang, onLang, voice, onVoice, onH
           <div>
             <p className="eyebrow">{t("ride.before")}</p>
             <h1 id="setup-title" className="mt-1 text-2xl font-medium tracking-tight">{t("ride.setupTitle")}</h1>
-            <p className="mt-2 text-[15px] text-muted">{t("ride.setupBody")}</p>
+            <p className="mt-2 text-[15px] text-muted">{demo ? t("ride.demoNote") : t("ride.setupBody")}</p>
           </div>
 
-          <ul className="space-y-2">
+          {!demo && <ul className="space-y-2">
             {CHECKS.map((c, i) => (
               <li key={c}>
                 <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-line bg-card p-3 transition-colors has-[:checked]:border-moss has-[:checked]:bg-sage/40">
@@ -52,7 +51,7 @@ export default function SafetyIntro({ onStart, lang, onLang, voice, onVoice, onH
                 </label>
               </li>
             ))}
-          </ul>
+          </ul>}
 
           <fieldset>
             <legend className="text-sm text-muted">{t("ride.voice")}</legend>
@@ -62,11 +61,6 @@ export default function SafetyIntro({ onStart, lang, onLang, voice, onVoice, onH
               ))}
               <button type="button" onClick={onHearGuide} className="chip"><Volume />{t("ride.hear")}</button>
             </div>
-            <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label={t("nav.language")}>
-              {LANG_CODES.map((code) => (
-                <button key={code} type="button" lang={LANGS[code].bcp47} className="chip" aria-pressed={lang === code} onClick={() => onLang(code)}>{LANGS[code].name}</button>
-              ))}
-            </div>
           </fieldset>
         </div>
 
@@ -74,7 +68,7 @@ export default function SafetyIntro({ onStart, lang, onLang, voice, onVoice, onH
           <button onClick={onStart} disabled={!ready} className="pill pill-ink w-full disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0">
             {t("ride.startRide")} <ArrowUpRight />
           </button>
-          {!ready && <p className="mt-2 text-center text-xs text-muted">{t("ride.tick")}</p>}
+          {!ready && !demo && <p className="mt-2 text-center text-xs text-muted">{t("ride.tick")}</p>}
         </div>
       </motion.section>
     </div>

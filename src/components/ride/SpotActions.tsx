@@ -2,7 +2,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Close, Camera, Navigate } from "@/components/ui/Icons";
+import { Close, Camera, Navigate, Volume } from "@/components/ui/Icons";
 import { useI18n } from "@/lib/i18n/client";
 import { MISSION_KEY } from "./engine";
 
@@ -35,6 +35,7 @@ export function SpotButton({ className, children }: { className?: string; childr
   }, [open]);
 
   const video = () => { keep([]); router.push("/ride"); };
+  const demo = () => { keep([]); router.push("/ride?demo=1"); };
   const route = () => {
     setBusy(true); setNote(null);
     if (!navigator.geolocation) { setBusy(false); setNote(t("map.noLocationSupport")); return; }
@@ -73,6 +74,10 @@ export function SpotButton({ className, children }: { className?: string; childr
                 <button type="button" onClick={route} disabled={busy} className={option}>
                   <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-ink text-paper"><Navigate /></span>
                   <span><span className="block text-[17px] font-medium">{busy ? t("spotpick.locating") : t("spotpick.route")}</span><span className="mt-0.5 block text-sm text-muted">{t("spotpick.routeBody")}</span></span>
+                </button>
+                <button type="button" onClick={demo} className={option}>
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-taxi text-ink"><Volume /></span>
+                  <span><span className="block text-[17px] font-medium">{t("spotpick.demo")}</span><span className="mt-0.5 block text-sm text-muted">{t("spotpick.demoBody")}</span></span>
                 </button>
               </div>
               <p role="status" aria-live="polite" className="mt-3 min-h-5 text-sm text-muted">{note}</p>

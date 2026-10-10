@@ -9,8 +9,7 @@ import Recap from "./Recap";
 import RideHud from "./RideHud";
 import SafetyIntro from "./SafetyIntro";
 import type { Phase, RideEvent } from "./types";
-import { useRouter } from "next/navigation";
-import { saveLang, useI18n } from "@/lib/i18n/client";
+import { useI18n } from "@/lib/i18n/client";
 import { briefPhrase, resultPhrase, voicePhrase } from "@/lib/voice";
 
 const noSubscribe = () => () => {};
@@ -26,14 +25,13 @@ const save = (key: string, value: string) => { try { localStorage.setItem(key, v
 
 // The camera opens straight away. Setup is a pop-up over it; "start ride" swaps the pop-up for the ride display.
 // intro (camera + setup pop-up) → riding → recap.
-export default function RideScreen() {
+export default function RideScreen({ demo = false }: { demo?: boolean }) {
   const [phase, setPhase] = useState<Phase>("intro");
   const [events, setEvents] = useState<RideEvent[]>([]);
   const [last, setLast] = useState<RideEvent | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // The site's language is also the voice's language.
   const { t, lang } = useI18n();
-  const router = useRouter();
   // The saved voice is only known in the browser; this reads it without a hydration mismatch.
   const detectedVoice = useSyncExternalStore(noSubscribe, savedVoice, () => "f" as Voice);
   const [chosenVoice, setChosenVoice] = useState<Voice | null>(null);
@@ -45,7 +43,7 @@ export default function RideScreen() {
   const speech = useSpeech(voice);
   const riding = phase === "riding";
 
-  const { ref: videoRef, state: cameraState, torchSupported, torchOn, setTorch } = useCamera(phase !== "recap");
+  const { ref: videoRef, state: cameraState, torchSupported, torchOn, setTorch } = useCamera(phase !== "recap" && !demo);
   useWakeLock(riding);
 
   const onResult = useCallback((e: RideEvent) => {
@@ -93,7 +91,7 @@ export default function RideScreen() {
   const onTargetClose = useCallback(() => speech.say(voicePhrase(lang, "spotAhead"), lang), [speech, lang]);
   const onAtSpot = useCallback(() => speech.say(voicePhrase(lang, "atSpot"), lang, true), [speech, lang]);
   const onNext = useCallback((place: string | null) => speech.say(voicePhrase(lang, place ? "next" : "finished"), lang), [speech, lang]);
-  const { pos, gps, online, spots, hazards, stops, target, alert, skip } = useRideEngine({ active: riding, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear });
+  const { pos, gps, online, spots, hazards, stops, target, alert, skip, finished } = useRideEngine({ active: riding, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, demo });
   const compass = useCompass(riding);
 
   // Say so the first time GPS locks on, so the rider knows it's working without looking.
@@ -134,7 +132,8 @@ export default function RideScreen() {
     <div className="fixed inset-0 z-[3000] bg-ink text-paper">
       {/* one camera for both setup and the ride, so it never restarts in between */}
       <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" playsInline muted autoPlay aria-hidden />
-      {cameraState !== "on" && (
+      {demo && <div className="absolute inset-0 bg-[linear-gradient(180deg,#2b2c28,#1a1b19)]" aria-hidden><div className="absolute inset-y-0 left-1/2 w-[3px] -translate-x-1/2 bg-[repeating-linear-gradient(180deg,rgba(250,250,247,.35)_0_40px,transparent_40px_80px)]" /></div>}
+      {!demo && cameraState !== "on" && (
         // out of the way at the top, so it never lands behind the setup card
         <p role="status" className="absolute inset-x-6 text-center text-sm text-paper/70" style={{ top: "calc(env(safe-area-inset-top) + 84px)" }}>
           {cameraState === "denied" ? t("hud.cameraDenied") : t("hud.cameraStarting")}
@@ -144,15 +143,15 @@ export default function RideScreen() {
 
       {riding ? (
         <RideHud
-          gps={gps} online={online} last={last} events={events} notice={notice} paused={paused}
+          demo={demo} gps={gps} online={online} last={last} events={events} notice={notice} paused={paused}
           torch={torchSupported ? torchOn : null} onToggleTorch={toggleTorch}
           voiceOn={speech.on} count={events.length} onTogglePause={() => setPaused((p) => !p)} onToggleVoice={() => speech.setOn(!speech.on)} onEnd={end}
         >
-          <NavOverlay pos={pos} compass={compass} target={target} alert={alert} spots={spots} hazards={hazards} stops={stops} finished={stops.length > 0 && !target} onSkip={skip} />
+          <NavOverlay pos={pos} compass={compass} target={target} alert={alert} spots={spots} hazards={hazards} stops={stops} finished={finished} onSkip={skip} />
         </RideHud>
       ) : (
         <SafetyIntro
-          onStart={start} lang={lang} onLang={(l) => { saveLang(l); router.refresh(); }}
+          onStart={start} demo={demo}
           voice={voice} onVoice={(v) => { setChosenVoice(v); save("spotholes-voice", v); }}
           onHearGuide={hearGuide} onRoute={setRoute}
         />

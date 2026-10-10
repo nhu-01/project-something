@@ -10,6 +10,7 @@ const FRAME_MS = 800; // how often a frame is taken
 const MAX_IN_FLIGHT = 2; // frames being checked at once, so a slow answer doesn't stall the camera
 const NEEDED = 2; // photos from one pass that count as "done" at a 311 spot
 const FT = 3.28084;
+const SIM_SPEED = 9; // m/s in the demo: brisk, so the loop takes about a minute
 export const MISSION_KEY = "spotholes-mission"; // stops chosen on the map or from a destination
 const toHazard = (s?: string): Hazard => (s === "bump" || s === "rough" ? s : "pothole");
 const toSev = (n: number | null): Sev | null => (n == null ? null : (Math.min(5, Math.max(1, Math.round(n))) as Sev));
@@ -70,17 +71,19 @@ type Opts = {
   onAtSpot: (place: string) => void; // arrived at it
   onNext: (place: string | null) => void; // moved on to a new target (null: nothing left)
   onNear: (place: string) => void; // a pothole is close by
+  demo?: boolean; // a scripted ride past real 311 spots: no GPS, no camera, nothing is sent or saved
 };
 
 // Runs a ride: follows the rider's GPS, points to the next 311 spot, and sends camera frames to the server, which adds
 // photos to the 311 report you are standing at (or logs a new hazard anywhere else).
-export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear }: Opts) {
+export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, demo = false }: Opts) {
   const [pos, setPos] = useState<Pos | null>(null);
   const [gps, setGps] = useState<GpsState>("waiting");
   const [online, setOnline] = useState(true);
   const [spots, setSpots] = useState<Spot[]>([]);
   const [hazards, setHazards] = useState<NearbyHazard[]>([]);
-  const stops = useMemo(() => (active ? storedStops() : []), [active]); // the chosen route, if any
+  const stops = useMemo(() => (active && !demo ? storedStops() : []), [active, demo]); // the chosen route, if any
+  const [finished, setFinished] = useState(false);
   const [target, setTarget] = useState<NavTarget | null>(null);
   const [alert, setAlert] = useState<NearAlert | null>(null);
   const [distanceM, setDistanceM] = useState(0);
@@ -94,6 +97,7 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
   const skipRequested = useRef(false);
   const posRef = useRef<Pos | null>(null);
   const targetIdRef = useRef<string | null>(null);
+  const targetRef = useRef<Spot | null>(null);
   const spotsRef = useRef<Spot[]>([]); // read by the timer, which must not run inside a state updater
   const hazardsRef = useRef<NearbyHazard[]>([]);
 
@@ -111,7 +115,7 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
     const warnedClose = new Set<string>(), warnedAt = new Set<string>(), warnedNear = new Set<string>();
     const canvas = document.createElement("canvas"), tiny = document.createElement("canvas");
     photosAt.current.clear(); doneSet.current.clear(); targetIdRef.current = null;
-    const missionStops = storedStops();
+    const missionStops = demo ? [] : storedStops();
 
     // start (or restart) the ride on the server; retried until it works, so a ride begun with no signal still counts
     const ensureRide = async () => {
@@ -123,8 +127,8 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
       } catch { setOnline(false); }
       startingRide = false;
     };
-    void ensureRide();
-    const rideTimer = setInterval(() => void ensureRide(), 5000);
+    if (!demo) void ensureRide();
+    const rideTimer = demo ? null : setInterval(() => void ensureRide(), 5000);
 
     const emit = (e: ServerEvent | null | undefined, frame?: { blob: Blob; aspect: number } | null) => {
       if (!e || stopped) return;
@@ -172,8 +176,48 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
       } catch { /* offline: keep what we have */ }
     };
 
+    // demo: walk a short, real 311 loop at a brisk pace and "take" photos on arrival, so the whole ride screen,
+    // arrow, map and voice can be seen without moving, a camera, or writing anything to the database
+    let simTimer: ReturnType<typeof setInterval> | null = null;
+    if (demo) {
+      void (async () => {
+        setGps("ok"); setOnline(true);
+        try {
+          const c = { lat: 40.7306, lng: -73.9866 };
+          const res = await fetch(`/api/targets?lat=${c.lat}&lng=${c.lng}&r=1500`);
+          const body = (await res.json()) as { spots: Spot[] };
+          const pool = [...body.spots];
+          const loop: Spot[] = [];
+          let here: { lat: number; lng: number } = c;
+          while (loop.length < 3 && pool.length) {
+            pool.sort((a, b) => meters(here, a) - meters(here, b));
+            const next = pool.shift()!;
+            if (loop.some((s) => meters(s, next) < 60)) continue;
+            loop.push(next); here = next;
+          }
+          if (stopped || !loop.length) return;
+          spotsRef.current = loop; setSpots(loop);
+          const start = { lat: loop[0].lat - 260 / 111320, lng: loop[0].lng, heading: 0, accuracy: 6, speed: SIM_SPEED };
+          posRef.current = start; setPos(start);
+        } catch { /* offline: the demo just waits */ }
+      })();
+      let hold = 0;
+      simTimer = setInterval(() => {
+        const p = posRef.current, tg = targetRef.current;
+        if (stopped || live.current.paused || !p || !tg) return;
+        const d = meters(p, tg);
+        if (d > 20) {
+          const step = Math.min(d - 20, SIM_SPEED * 0.4), b = bearing(p, tg);
+          const next: Pos = { lat: p.lat + (step * Math.cos(rad(b))) / 111320, lng: p.lng + (step * Math.sin(rad(b))) / (111320 * Math.cos(rad(p.lat))), heading: b, accuracy: 6, speed: SIM_SPEED };
+          posRef.current = next; setPos(next); hold = 0;
+          return;
+        }
+        if (++hold % 4 === 0) emit({ kind: "photo", source: "311", potholeId: tg.id, hazard: "pothole", street: tg.place, lane: "right lane", severity: 3 }, null);
+      }, 400);
+    }
+
     // follow the rider
-    const watch = navigator.geolocation?.watchPosition(
+    const watch = demo ? null : navigator.geolocation?.watchPosition(
       (g) => {
         const here = { lat: g.coords.latitude, lng: g.coords.longitude };
         const now = Date.now();
@@ -193,13 +237,13 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
       (err) => { if (err.code === err.PERMISSION_DENIED) setGps("denied"); },
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 },
     );
-    if (watch == null) setGps("denied");
+    if (watch == null && !demo) setGps("denied");
 
     // choose the target, and fire the voice cues
     const tick = setInterval(() => {
       const p = posRef.current;
       if (stopped || live.current.paused || !p) return;
-      if (!lastFetch || Date.now() - lastFetch.at > 30000 || meters(lastFetch, p) > 150) void refreshTargets();
+      if (!demo && (!lastFetch || Date.now() - lastFetch.at > 30000 || meters(lastFetch, p) > 150)) void refreshTargets();
 
       const acc = p.accuracy ?? 10;
       const arriveM = Math.min(60, Math.max(40, acc + 20));
@@ -216,7 +260,14 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
         if (chosen && doneSet.current.has(chosen.id)) chosen = missionStops.length ? open.filter((c) => !doneSet.current.has(c.id))[0] : [...open].filter((c) => !doneSet.current.has(c.id)).sort((a, b) => score(a) - score(b))[0];
 
         // a spot is finished once this pass has added enough photos to it
-        if (chosen && (photosAt.current.get(chosen.id) ?? 0) >= NEEDED) { doneSet.current.add(chosen.id); chosen = undefined; }
+        // (and the next open one is picked straight away, so "finished" is only said when nothing is left)
+        while (chosen && (photosAt.current.get(chosen.id) ?? 0) >= NEEDED) {
+          doneSet.current.add(chosen.id);
+          const rest = candidates.filter((c) => !doneSet.current.has(c.id));
+          chosen = missionStops.length ? rest[0] : [...rest].sort((a, b) => score(a) - score(b))[0];
+        }
+        targetRef.current = chosen ?? null;
+        setFinished(!chosen && doneSet.current.size > 0);
 
         if (!chosen) {
           if (targetIdRef.current !== null) { targetIdRef.current = null; live.current.onNext(null); }
@@ -251,7 +302,7 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
     }, 400);
 
     // take a frame on a steady beat; up to MAX_IN_FLIGHT are checked at once
-    const frameTimer = setInterval(async () => {
+    const frameTimer = demo ? null : setInterval(async () => {
       const video = videoRef.current;
       if (stopped || live.current.paused || !ride || !posRef.current || !video || inFlight >= MAX_IN_FLIGHT || document.hidden) return;
       inFlight++;
@@ -263,14 +314,17 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
 
     return () => {
       stopped = true;
-      clearInterval(tick); clearInterval(frameTimer); clearInterval(rideTimer);
+      clearInterval(tick);
+      if (frameTimer) clearInterval(frameTimer);
+      if (rideTimer) clearInterval(rideTimer);
+      if (simTimer) clearInterval(simTimer);
       if (watch != null) navigator.geolocation.clearWatch(watch);
-      setTarget(null); setAlert(null); setGps("waiting"); setPos(null);
+      setTarget(null); setAlert(null); setFinished(false); setGps("waiting"); setPos(null);
       posRef.current = null;
       const r = ride;
       if (r) void fetch(`/api/rides/${r.rideId}/end`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: r.token }), keepalive: true }).catch(() => {});
     };
-  }, [active, videoRef]);
+  }, [active, videoRef, demo]);
 
-  return { pos, gps, online, spots, hazards, stops, target, alert, distanceM, skip, skipTick };
+  return { pos, gps, online, spots, hazards, stops, target, alert, distanceM, skip, skipTick, finished };
 }

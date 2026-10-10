@@ -70,7 +70,9 @@ export function CitySheet({ report, onClose, onGo, onPlan, planning }: { report:
         <p className="text-sm text-muted">{has ? t("city.bodyPhotos") : t("city.body")}</p>
         <div className="flex flex-wrap gap-3">
           <button onClick={onGo} className="pill pill-ink">{t("city.photograph")}</button>
-          <Link href={`/spots/${report.id}`} className="pill pill-line">{t("city.allPhotos")} <ArrowUpRight /></Link>
+          {report.photoCount > 0
+            ? <Link href={`/spots/${report.id}`} className="pill pill-line">{t("city.allPhotos")} <ArrowUpRight /></Link>
+            : <span className="inline-flex min-h-11 items-center px-2 text-sm text-muted">{t("city.noPhotosYet")}</span>}
         </div>
         <div className="flex flex-wrap gap-x-5 text-sm">
           <button onClick={onPlan} disabled={planning} className="tap underline underline-offset-4 disabled:opacity-60">{planning ? t("map.finding") : t("city.plan")}</button>
