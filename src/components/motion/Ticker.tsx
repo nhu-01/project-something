@@ -14,7 +14,7 @@ export default function Ticker({ potholes, t, lang }: { potholes: Pothole[]; t: 
     <ul className="flex shrink-0 items-center gap-10 pr-10" aria-hidden={hidden || undefined}>
       {filled.map((p, i) => (
         <li key={`${p.id}-${i}`}>
-          <Link href={`/potholes/${p.id}`} tabIndex={hidden ? -1 : 0} className="flex items-center gap-3 whitespace-nowrap text-[15px] transition-opacity hover:opacity-70">
+          <Link href={`/potholes/${p.id}`} tabIndex={hidden ? -1 : 0} className="tap flex items-center gap-3 whitespace-nowrap text-[15px] transition-opacity hover:opacity-70">
             <SeverityBullet value={p.severity!} />
             <span className="font-medium">{t(`hazard.${p.kind}` as Key)}</span>
             <span className="text-muted">{p.street}{p.borough ? `, ${p.borough}` : ""} · {ago(p.lastSeen, lang)}</span>

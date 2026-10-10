@@ -89,9 +89,9 @@ export default function PassReel({ potholes }: { potholes: Pothole[] }) {
           })}
         </div>
         {n > 1 && (
-          <div className="mt-12 flex justify-center gap-2" role="group" aria-label={t("reel.choose")}>
+          <div className="mt-10 flex justify-center" role="group" aria-label={t("reel.choose")}>
             {slides.map((s, i) => (
-              <button key={s.key} type="button" onClick={() => setActive(i)} aria-label={t("reel.photoN", { n: i + 1 })} aria-current={i === active || undefined} className="grid h-6 w-6 place-items-center">
+              <button key={s.key} type="button" onClick={() => setActive(i)} aria-label={t("reel.photoN", { n: i + 1 })} aria-current={i === active || undefined} className="grid h-11 w-11 place-items-center">
                 <span className={`h-2 rounded-full transition-all duration-300 ${i === active ? "w-5 bg-ink" : "w-2 bg-line"}`} />
               </button>
             ))}
@@ -105,7 +105,7 @@ export default function PassReel({ potholes }: { potholes: Pothole[] }) {
         <div className="mt-6"><Timeline sightings={p.sightings.slice(-4)} activeId={cur.sightingId} /></div>
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted">{t("reel.note")}</p>
-          <Link href={`/potholes/${p.id}`} className="text-sm underline underline-offset-4">{t("common.fullHistory")}</Link>
+          <Link href={`/potholes/${p.id}`} className="tap text-sm underline underline-offset-4">{t("common.fullHistory")}</Link>
         </div>
       </div>
     </div>

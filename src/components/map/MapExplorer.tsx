@@ -76,7 +76,7 @@ export default function MapExplorer({ potholes, tracks, city }: { potholes: Poth
           <span className="sr-only">{t("map.search")}</span>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("map.search")} className="w-full bg-transparent text-[15px] outline-none placeholder:text-muted" />
         </label>
-        <div className="pointer-events-auto flex flex-wrap gap-2" role="group" aria-label={t("map.filters")}>
+        <div className="pointer-events-auto -mx-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&>*]:shrink-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label={t("map.filters")}>
           {(["all", "open", "repaired"] as StatusFilter[]).map((s) => (
             <button key={s} className="chip shadow-sm" aria-pressed={status === s} onClick={() => setStatus(s)}>{s === "all" ? t("map.all") : s === "open" ? t("map.fOpen") : t("map.fRepaired")}</button>
           ))}
