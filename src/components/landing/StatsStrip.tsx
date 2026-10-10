@@ -4,7 +4,7 @@ import type { Stats } from "@/lib/data/types";
 import type { T } from "@/lib/i18n";
 
 export default function StatsStrip({ stats, t }: { stats: Stats; t: T }) {
-  const items: [string, number][] = [[t("stats.strip.tracked"), stats.tracked], [t("stats.strip.open"), stats.open], [t("stats.strip.rides"), stats.ridesThisWeek], [t("stats.strip.repaired"), stats.repairedThisWeek]];
+  const items: [string, number][] = [[t("stats.strip.spots"), stats.citySpots], [t("stats.strip.photographed"), stats.cityPhotographed], [t("stats.strip.photos"), stats.cityPhotos], [t("stats.strip.riders"), stats.ridesThisWeek]];
   return (
     <section className="wrap mt-28" aria-label={t("nav.progress")}>
       <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-3xl border border-line bg-line md:grid-cols-4">

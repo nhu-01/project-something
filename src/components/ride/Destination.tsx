@@ -1,21 +1,19 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { SeverityBullet } from "@/components/ui/Bullet";
 import { Close, Search } from "@/components/ui/Icons";
-import type { Severity } from "@/lib/data/types";
 import { distance } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/client";
-import { plural, type Key } from "@/lib/i18n";
+import { plural } from "@/lib/i18n";
+import type { Spot } from "./types";
 
 type Place = { label: string; lat: number; lng: number };
-type RouteHazard = { id: string; kind: string; street: string; lane: string; severity: number; alongM: number };
-type Result = { hazards: RouteHazard[]; distanceM: number; routed: boolean };
-
-const hazardKey = (k: string) => `hazard.${k === "bump" || k === "rough" ? k : "pothole"}` as Key;
+type RouteSpot = Spot & { alongM: number };
+type Result = { spots: RouteSpot[]; distanceM: number; routed: boolean };
+export type PlannedRoute = { spots: Spot[]; label: string };
 const here = () => new Promise<GeolocationPosition>((res, rej) => navigator.geolocation ? navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 10000 }) : rej(new Error("no gps")));
 
-// Optional: say where you're heading and get the known hazards on the way before you set off.
-export default function Destination({ onRoute, compact = false }: { onRoute: (count: number | null, label: string | null) => void; compact?: boolean }) {
+// Optional: say where you're heading and the 311 spots on the way become your ride's stops, in order.
+export default function Destination({ onRoute, compact = false }: { onRoute: (route: PlannedRoute | null) => void; compact?: boolean }) {
   const { t } = useI18n();
   const [q, setQ] = useState("");
   const [options, setOptions] = useState<Place[]>([]);
@@ -42,14 +40,14 @@ export default function Destination({ onRoute, compact = false }: { onRoute: (co
     setPicked(p); setQ(p.label); setOptions([]); setState("loading"); setResult(null);
     try {
       const pos = await here().catch(() => null);
-      if (!pos) { setState("nogps"); onRoute(null, null); return; }
+      if (!pos) { setState("nogps"); onRoute(null); return; }
       const res = await fetch(`/api/route?from=${pos.coords.latitude},${pos.coords.longitude}&to=${p.lat},${p.lng}`);
       if (!res.ok) throw new Error("route failed");
       const r = (await res.json()) as Result;
-      setResult(r); setState("idle"); onRoute(r.hazards.length, p.label);
-    } catch { setState("error"); onRoute(null, null); }
+      setResult(r); setState("idle"); onRoute(r.spots.length ? { spots: r.spots.map(({ id, lat, lng, place, borough, photos }) => ({ id, lat, lng, place, borough, photos })), label: p.label } : null);
+    } catch { setState("error"); onRoute(null); }
   };
-  const clear = () => { seq.current++; setPicked(null); setQ(""); setOptions([]); setResult(null); setState("idle"); onRoute(null, null); };
+  const clear = () => { seq.current++; setPicked(null); setQ(""); setOptions([]); setResult(null); setState("idle"); onRoute(null); };
 
   return (
     <div className={compact ? "text-ink" : "mt-8"}>
@@ -57,7 +55,7 @@ export default function Destination({ onRoute, compact = false }: { onRoute: (co
       <div className={compact ? "relative" : "relative mt-3"}>
         <div className="flex h-12 items-center gap-3 rounded-full border border-line bg-card px-4">
           <Search />
-          <input id="dest" value={q} onChange={(e) => { setQ(e.target.value); if (picked) { setPicked(null); setResult(null); onRoute(null, null); } }} placeholder={t("dest.label")} autoComplete="off" className="w-full bg-transparent text-[15px] outline-none placeholder:text-muted" />
+          <input id="dest" value={q} onChange={(e) => { setQ(e.target.value); if (picked) { setPicked(null); setResult(null); onRoute(null); } }} placeholder={t("dest.label")} autoComplete="off" className="w-full bg-transparent text-[15px] outline-none placeholder:text-muted" />
           {q && <button type="button" onClick={clear} aria-label={t("dest.clear")} className="grid h-8 w-8 place-items-center rounded-full text-muted"><Close /></button>}
         </div>
         {options.length > 0 && (
@@ -75,20 +73,19 @@ export default function Destination({ onRoute, compact = false }: { onRoute: (co
         {state === "error" && <p className="mt-3 text-sm text-muted">{t("dest.error")}</p>}
         {result && (
           <div className="card mt-3 p-4">
-            <p className="font-medium">{result.hazards.length === 0 ? t("dest.none") : plural(t, "dest.count", result.hazards.length)}</p>
-            <p className="text-sm text-muted">{distance(result.distanceM)} · {result.routed ? t("dest.routed") : t("dest.straight")} · {t("dest.onlyKnown")}</p>
-            {result.hazards.length > 0 && (
+            <p className="font-medium">{result.spots.length === 0 ? t("dest.none") : plural(t, "dest.count", result.spots.length)}</p>
+            <p className="text-sm text-muted">{distance(result.distanceM)} · {result.routed ? t("dest.routed") : t("dest.straight")}</p>
+            {result.spots.length > 0 && (
               <ul className="mt-3 divide-y divide-line">
-                {result.hazards.slice(0, compact ? 3 : 6).map((h) => (
+                {result.spots.slice(0, compact ? 3 : 6).map((h) => (
                   <li key={h.id} className="flex items-center gap-3 py-2 text-[15px]">
-                    <SeverityBullet value={Math.min(5, Math.max(1, Math.round(h.severity))) as Severity} />
-                    <span className="min-w-0 flex-1 truncate">{t(hazardKey(h.kind))} · {h.street}<span className="text-muted"> · {h.lane}</span></span>
+                    <span className="min-w-0 flex-1 truncate">{h.place}</span>
                     <span className="text-sm text-muted">{distance(h.alongM)}</span>
                   </li>
                 ))}
               </ul>
             )}
-            {result.hazards.length > (compact ? 3 : 6) && <p className="mt-2 text-sm text-muted">{t("dest.more", { n: result.hazards.length - (compact ? 3 : 6) })}</p>}
+            {result.spots.length > (compact ? 3 : 6) && <p className="mt-2 text-sm text-muted">{t("dest.more", { n: result.spots.length - (compact ? 3 : 6) })}</p>}
           </div>
         )}
       </div>

@@ -3,7 +3,7 @@ import { query } from "./db";
 import { bbox, meters } from "./geo";
 
 export type LatLng = [number, number];
-export type RouteHazard = { id: string; kind: string; street: string; lane: string; severity: number; alongM: number };
+export type RouteSpot = { id: string; lat: number; lng: number; place: string; borough: string; photos: number; alongM: number };
 
 // A cycling route from a public OpenStreetMap routing server. If it's unavailable we fall back to a straight line,
 // which is only a rough guide (and is labelled as such in the UI).
@@ -28,36 +28,36 @@ function toSegment(p: LatLng, a: LatLng, b: LatLng) {
   return { d: Math.hypot(ax + t * dx, ay + t * dy), t };
 }
 
-export async function hazardsOnTheWay(from: LatLng, to: LatLng) {
+export async function spotsOnTheWay(from: LatLng, to: LatLng) {
   const routed = await bikeRoute([from, to]);
   // very long routes come back with thousands of points; thin them so matching stays fast
   const full = routed ?? [from, to];
   const step = Math.max(1, Math.ceil(full.length / 1500));
   const line = full.filter((_, i) => i % step === 0 || i === full.length - 1);
-  const corridorM = routed ? 30 : 180; // a real route can be tight; a straight line has to be generous
+  const corridorM = routed ? 40 : 180; // a real route can be tight; a straight line has to be generous
 
   const lats = line.map((p) => p[0]), lngs = line.map((p) => p[1]);
   const [minLat, , minLng] = bbox(Math.min(...lats), Math.min(...lngs), corridorM);
   const [, maxLat, , maxLng] = bbox(Math.max(...lats), Math.max(...lngs), corridorM);
-  const rows = await query<{ id: number; lat: number; lng: number; kind: string; street: string; lane: string; severity: number | null }>(
-    "SELECT id, lat, lng, kind, street, lane, severity FROM potholes WHERE status='open' AND merged_into IS NULL AND lat BETWEEN $1 AND $2 AND lng BETWEEN $3 AND $4 LIMIT 20000",
+  const rows = await query<{ id: string; lat: number; lng: number; place: string; borough: string; photo_count: number }>(
+    "SELECT id, lat, lng, place, borough, photo_count FROM city_reports WHERE status <> 'Closed' AND lat BETWEEN $1 AND $2 AND lng BETWEEN $3 AND $4 LIMIT 20000",
     [minLat, maxLat, minLng, maxLng],
   );
 
   const cum: number[] = [0];
   for (let i = 1; i < line.length; i++) cum.push(cum[i - 1] + meters(line[i - 1][0], line[i - 1][1], line[i][0], line[i][1]));
 
-  const hazards: RouteHazard[] = [];
+  const spots: RouteSpot[] = [];
   for (const r of rows) {
     let best = { d: Infinity, along: 0 };
     for (let i = 1; i < line.length; i++) {
       const s = toSegment([r.lat, r.lng], line[i - 1], line[i]);
       if (s.d < best.d) best = { d: s.d, along: cum[i - 1] + s.t * (cum[i] - cum[i - 1]) };
     }
-    if (best.d <= corridorM) hazards.push({ id: String(r.id), kind: r.kind, street: r.street, lane: r.lane, severity: r.severity ?? 2, alongM: Math.round(best.along) });
+    if (best.d <= corridorM) spots.push({ id: r.id, lat: r.lat, lng: r.lng, place: r.place, borough: r.borough, photos: r.photo_count, alongM: Math.round(best.along) });
   }
-  hazards.sort((a, b) => a.alongM - b.alongM);
-  return { hazards, distanceM: Math.round(cum[cum.length - 1]), routed: Boolean(routed) };
+  spots.sort((a, b) => a.alongM - b.alongM);
+  return { spots, distanceM: Math.round(cum[cum.length - 1]), routed: Boolean(routed) };
 }
 
 const STOPS = 5;
@@ -69,7 +69,9 @@ export async function photoMission(from: LatLng) {
   const stops: typeof pool = [];
   let here = from;
   while (stops.length < STOPS && pool.length) {
-    pool.sort((a, b) => meters(here[0], here[1], a.lat, a.lng) - meters(here[0], here[1], b.lat, b.lng));
+    // a spot with no photos is worth a detour: each existing photo counts as 400 m of extra distance
+    const score = (r: (typeof pool)[number]) => meters(here[0], here[1], r.lat, r.lng) + r.photoCount * 400;
+    pool.sort((a, b) => score(a) - score(b));
     const next = pool.shift()!;
     // two reports for the same corner would be one photo stop
     if (stops.some((s) => meters(s.lat, s.lng, next.lat, next.lng) < 60)) continue;

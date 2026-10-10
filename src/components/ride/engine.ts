@@ -1,36 +1,30 @@
 "use client";
-import { useEffect, useRef, useState, type RefObject } from "react";
-import type { GpsState, Hazard, RideEvent, Sev, Upcoming } from "./types";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import type { GpsState, Hazard, NavTarget, NearAlert, NearbyHazard, Pos, RideEvent, Sev, Spot } from "./types";
 
-type Known = { id: string; lat: number; lng: number; street: string; lane: string; severity: number; kind?: string };
-type Pos = { lat: number; lng: number; heading: number | null; accuracy: number | null; speed: number };
-type ServerEvent = { kind: RideEvent["kind"]; potholeId: string; hazard?: string; street: string; lane: string; severity: number | null };
-type Crumb = { lat: number; lng: number; t: number };
+type ServerEvent = {
+  kind: RideEvent["kind"]; source?: "311" | "rider"; potholeId: string; hazard?: string; street: string; lane: string; severity: number | null;
+};
 
-const PASS_M = 20; // closer than this counts as having reached it
 const FRAME_MS = 800; // how often a frame is taken
 const MAX_IN_FLIGHT = 2; // frames being checked at once, so a slow answer doesn't stall the camera
-const MAX_CRUMBS = 6000; // breadcrumbs kept while offline (hours of riding)
+const NEEDED = 2; // photos from one pass that count as "done" at a 311 spot
 const FT = 3.28084;
+export const MISSION_KEY = "spotholes-mission"; // stops chosen on the map or from a destination
 const toHazard = (s?: string): Hazard => (s === "bump" || s === "rough" ? s : "pothole");
-
-// Faster riders need earlier warnings: about 9 seconds' notice, never less than 45 m or more than 260 m.
-const warnDistance = (speed: number) => Math.min(260, Math.max(45, speed * 9));
-// ...and need to know about hazards further out.
-const lookAhead = (speed: number) => Math.min(3000, Math.max(600, speed * 60));
+const toSev = (n: number | null): Sev | null => (n == null ? null : (Math.min(5, Math.max(1, Math.round(n))) as Sev));
 
 const rad = (d: number) => (d * Math.PI) / 180;
-function meters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+export function meters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lng - a.lng) / 2) ** 2;
   return 2 * 6371000 * Math.asin(Math.sqrt(h));
 }
-function bearing(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+export function bearing(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const y = Math.sin(rad(b.lng - a.lng)) * Math.cos(rad(b.lat));
   const x = Math.cos(rad(a.lat)) * Math.sin(rad(b.lat)) - Math.sin(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.cos(rad(b.lng - a.lng));
   return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }
-const angleDiff = (a: number, b: number) => Math.abs(((a - b + 540) % 360) - 180);
-const toSev = (n: number | null): Sev | null => (n == null ? null : (Math.min(5, Math.max(1, Math.round(n))) as Sev));
+export const ft = (m: number) => m * FT;
 
 export function deviceId() {
   try {
@@ -38,6 +32,13 @@ export function deviceId() {
     if (!id) { id = crypto.randomUUID(); localStorage.setItem("spotholes-device", id); }
     return id;
   } catch { return crypto.randomUUID(); }
+}
+
+function storedStops(): Spot[] {
+  try {
+    const raw = sessionStorage.getItem(MISSION_KEY);
+    return raw ? (JSON.parse(raw) as Spot[]).filter((s) => s && Number.isFinite(s.lat) && Number.isFinite(s.lng)) : [];
+  } catch { return []; }
 }
 
 // Letterboxes the current video frame to 640x640 for the detector, and measures how bright the scene is (0..1).
@@ -62,51 +63,57 @@ type Opts = {
   active: boolean;
   paused: boolean;
   videoRef: RefObject<HTMLVideoElement | null>;
-  onAhead: (u: Upcoming) => void;
   onResult: (e: RideEvent) => void;
   onHint: (hint: "screen") => void;
   onLuma: (luma: number) => void;
-  onStop: (place: string) => void; // nearing a stop on a suggested photo route
+  onTargetClose: (place: string) => void; // first time the target is within ~150 m
+  onAtSpot: (place: string) => void; // arrived at it
+  onNext: (place: string | null) => void; // moved on to a new target (null: nothing left)
+  onNear: (place: string) => void; // a pothole is close by
 };
 
-type RouteStop = { id: string; lat: number; lng: number; place: string };
-function routeStops(): RouteStop[] {
-  try { const raw = sessionStorage.getItem("spotholes-mission"); return raw ? (JSON.parse(raw) as RouteStop[]).filter((s) => Number.isFinite(s.lat) && Number.isFinite(s.lng)) : []; } catch { return []; }
-}
-
-// Runs a ride of any length and speed: tracks GPS, warns about saved hazards ahead, and sends camera frames to the
-// server, which detects new hazards and compares known ones with what earlier riders saw. Survives dropped signal.
-export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onHint, onLuma, onStop }: Opts) {
-  const [upcoming, setUpcoming] = useState<Upcoming | null>(null);
-  const [distance, setDistance] = useState(0);
+// Runs a ride: follows the rider's GPS, points to the next 311 spot, and sends camera frames to the server, which adds
+// photos to the 311 report you are standing at (or logs a new hazard anywhere else).
+export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear }: Opts) {
+  const [pos, setPos] = useState<Pos | null>(null);
   const [gps, setGps] = useState<GpsState>("waiting");
   const [online, setOnline] = useState(true);
-  const [meters_, setMeters] = useState(0); // distance covered this ride, from the GPS breadcrumbs
-  const live = useRef({ paused, onAhead, onResult, onHint, onLuma, onStop });
-  useEffect(() => { live.current = { paused, onAhead, onResult, onHint, onLuma, onStop }; }, [paused, onAhead, onResult, onHint, onLuma, onStop]);
+  const [spots, setSpots] = useState<Spot[]>([]);
+  const [hazards, setHazards] = useState<NearbyHazard[]>([]);
+  const stops = useMemo(() => (active ? storedStops() : []), [active]); // the chosen route, if any
+  const [target, setTarget] = useState<NavTarget | null>(null);
+  const [alert, setAlert] = useState<NearAlert | null>(null);
+  const [distanceM, setDistanceM] = useState(0);
+  const [skipTick, setSkipTick] = useState(0);
+
+  const live = useRef({ paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear });
+  useEffect(() => { live.current = { paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear }; }, [paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear]);
+
+  const photosAt = useRef(new Map<string, number>()); // photos this ride added to each 311 spot
+  const doneSet = useRef(new Set<string>()); // spots finished or skipped on this ride
+  const skipRequested = useRef(false);
+  const posRef = useRef<Pos | null>(null);
+  const targetIdRef = useRef<string | null>(null);
+  const spotsRef = useRef<Spot[]>([]); // read by the timer, which must not run inside a state updater
+  const hazardsRef = useRef<NearbyHazard[]>([]);
+
+  const skip = useCallback(() => { skipRequested.current = true; setSkipTick((n) => n + 1); }, []);
 
   useEffect(() => {
     if (!active) return;
     let stopped = false;
     let ride: { rideId: string; token: string } | null = null;
     let startingRide = false;
-    let pos: Pos | null = null;
     let prevFix: { lat: number; lng: number; t: number } | null = null;
-    let lastFetch: { at: number; lat: number; lng: number; r: number } | null = null;
-    let lastFrame: { blob: Blob; aspect: number } | null = null;
-    let current: { id: string; minD: number; warnM: number } | null = null;
+    let lastFetch: { at: number; lat: number; lng: number } | null = null;
     let lastHint = 0;
     let inFlight = 0;
-    let crumbs: Crumb[] = [];
-    let lastCrumb: { lat: number; lng: number } | null = null;
-    const stops = routeStops();
-    const announced = new Set<string>();
-    const known = new Map<string, Known>();
-    const warned = new Set<string>();
-    const resolved = new Set<string>(); // hazards that already got a result on this ride
+    const warnedClose = new Set<string>(), warnedAt = new Set<string>(), warnedNear = new Set<string>();
     const canvas = document.createElement("canvas"), tiny = document.createElement("canvas");
+    photosAt.current.clear(); doneSet.current.clear(); targetIdRef.current = null;
+    const missionStops = storedStops();
 
-    // Start (or restart) the ride on the server. Retried until it works, so a ride begun with no signal still counts.
+    // start (or restart) the ride on the server; retried until it works, so a ride begun with no signal still counts
     const ensureRide = async () => {
       if (ride || startingRide || stopped) return;
       startingRide = true;
@@ -119,157 +126,151 @@ export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onH
     void ensureRide();
     const rideTimer = setInterval(() => void ensureRide(), 5000);
 
-    // `frame` is the picture the server just judged; the ride screen shows it as the "photo taken" moment.
     const emit = (e: ServerEvent | null | undefined, frame?: { blob: Blob; aspect: number } | null) => {
       if (!e || stopped) return;
-      resolved.add(e.potholeId); warned.add(e.potholeId);
-      if (e.kind === "repaired") known.delete(e.potholeId);
-      live.current.onResult({ id: `${e.potholeId}-${e.kind}`, kind: e.kind, hazard: toHazard(e.hazard), street: e.street, lane: e.lane, severity: toSev(e.severity), at: Date.now(), shot: frame ? URL.createObjectURL(frame.blob) : undefined, shotAspect: frame?.aspect });
+      const source = e.source === "311" ? "311" : "rider";
+      if (source === "311") {
+        if (e.kind === "photo") photosAt.current.set(e.potholeId, (photosAt.current.get(e.potholeId) ?? 0) + 1);
+        if (e.kind === "not_found") doneSet.current.add(e.potholeId);
+      }
+      live.current.onResult({
+        id: `${source}-${e.potholeId}-${e.kind}-${Date.now()}`, kind: e.kind, source, hazard: toHazard(e.hazard), spotId: e.potholeId, street: e.street, lane: e.lane,
+        severity: toSev(e.severity), at: Date.now(), shot: frame ? URL.createObjectURL(frame.blob) : undefined, shotAspect: frame?.aspect,
+      });
     };
 
-    const send = async (path: "/api/scan" | "/api/pass", frame: Blob, extra: Record<string, string> = {}) => {
-      if (!ride || !pos) return null;
+    const send = async (frame: Blob) => {
+      const p = posRef.current;
+      if (!ride || !p) return null;
       const form = new FormData();
       form.append("rideId", ride.rideId); form.append("token", ride.token);
-      form.append("lat", String(pos.lat)); form.append("lng", String(pos.lng));
-      if (pos.heading != null) form.append("heading", String(pos.heading));
-      if (pos.accuracy != null) form.append("accuracy", String(pos.accuracy));
-      for (const [k, v] of Object.entries(extra)) form.append(k, v);
+      form.append("lat", String(p.lat)); form.append("lng", String(p.lng));
+      if (p.heading != null) form.append("heading", String(p.heading));
+      if (p.accuracy != null) form.append("accuracy", String(p.accuracy));
       form.append("frame", frame, "frame.jpg");
       try {
-        const res = await fetch(path, { method: "POST", body: form });
+        const res = await fetch("/api/scan", { method: "POST", body: form });
         if (res.status === 401) { ride = null; void ensureRide(); return null; } // the server lost this ride: start a fresh one
         setOnline(res.ok);
         if (!res.ok) return null;
         const body = (await res.json()) as { event: ServerEvent | null; hint?: "screen" };
-        // don't nag: at most one hint every 20 seconds
         if (body.hint && !stopped && Date.now() - lastHint > 20000) { lastHint = Date.now(); live.current.onHint(body.hint); }
         return body.event;
       } catch { setOnline(false); return null; }
     };
 
-    const refreshNearby = async () => {
-      if (!pos) return;
-      const r = lookAhead(pos.speed);
-      lastFetch = { at: Date.now(), lat: pos.lat, lng: pos.lng, r };
+    const refreshTargets = async () => {
+      const p = posRef.current;
+      if (!p) return;
+      lastFetch = { at: Date.now(), lat: p.lat, lng: p.lng };
+      const r = Math.min(3000, Math.max(800, p.speed * 90));
       try {
-        const res = await fetch(`/api/nearby?lat=${pos.lat}&lng=${pos.lng}&r=${Math.round(r)}`);
+        const res = await fetch(`/api/targets?lat=${p.lat}&lng=${p.lng}&r=${Math.round(r)}`);
         if (!res.ok) return;
-        for (const k of (await res.json()) as Known[]) if (!resolved.has(k.id)) known.set(k.id, k);
-        // on a long ride, forget hazards that are now far behind
-        for (const [id, k] of known) if (meters(pos, k) > r * 2 && current?.id !== id) known.delete(id);
+        const body = (await res.json()) as { spots: Spot[]; hazards: NearbyHazard[] };
+        spotsRef.current = body.spots; hazardsRef.current = body.hazards; setSpots(body.spots); setHazards(body.hazards);
       } catch { /* offline: keep what we have */ }
     };
 
     // follow the rider
     const watch = navigator.geolocation?.watchPosition(
-      (p) => {
-        const here = { lat: p.coords.latitude, lng: p.coords.longitude };
+      (g) => {
+        const here = { lat: g.coords.latitude, lng: g.coords.longitude };
         const now = Date.now();
-        let heading = p.coords.heading != null && !Number.isNaN(p.coords.heading) && (p.coords.speed ?? 0) > 0.5 ? p.coords.heading : pos?.heading ?? null;
-        let speed = p.coords.speed != null && !Number.isNaN(p.coords.speed) && p.coords.speed >= 0 ? p.coords.speed : pos?.speed ?? 0;
+        let heading = g.coords.heading != null && !Number.isNaN(g.coords.heading) && (g.coords.speed ?? 0) > 0.5 ? g.coords.heading : posRef.current?.heading ?? null;
+        let speed = g.coords.speed != null && !Number.isNaN(g.coords.speed) && g.coords.speed >= 0 ? g.coords.speed : posRef.current?.speed ?? 0;
         if (prevFix) {
           const moved = meters(prevFix, here), dt = (now - prevFix.t) / 1000;
           if (moved > 4) {
             heading = bearing(prevFix, here);
-            if (p.coords.speed == null && dt > 0.2) speed = Math.min(60, moved / dt); // some phones don't report speed
+            if (g.coords.speed == null && dt > 0.2) speed = Math.min(60, moved / dt); // some phones don't report speed
             prevFix = { ...here, t: now };
           }
         } else prevFix = { ...here, t: now };
-        pos = { ...here, heading, accuracy: p.coords.accuracy ?? null, speed };
-        // breadcrumb for the ridden-streets map: only decent fixes, only when we've actually moved
-        if ((p.coords.accuracy ?? 99) <= 50 && (!lastCrumb || meters(lastCrumb, here) > 6)) {
-          if (lastCrumb) { const step = meters(lastCrumb, here); if (step < 400) setMeters((m) => m + step); }
-          lastCrumb = here; crumbs.push({ ...here, t: now });
-          if (crumbs.length > MAX_CRUMBS) crumbs = crumbs.slice(-MAX_CRUMBS);
-        }
-        setGps("ok");
+        const next: Pos = { ...here, heading, accuracy: g.coords.accuracy ?? null, speed };
+        posRef.current = next; setPos(next); setGps("ok");
       },
       (err) => { if (err.code === err.PERMISSION_DENIED) setGps("denied"); },
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 },
     );
     if (watch == null) setGps("denied");
 
-    // upload breadcrumbs in batches; anything that fails is kept and retried
-    let flushing = false;
-    const flushCrumbs = async (keepalive = false) => {
-      if (flushing || !ride || !crumbs.length) return;
-      flushing = true;
-      for (let batchNo = 0; batchNo < 8 && crumbs.length && ride; batchNo++) {
-        const points = crumbs.slice(0, 80);
-        try {
-          const r = await fetch("/api/track", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ rideId: ride.rideId, token: ride.token, points }), keepalive });
-          if (r.status === 401) { ride = null; void ensureRide(); break; }
-          if (!r.ok) break;
-          crumbs = crumbs.slice(points.length);
-        } catch { break; }
-      }
-      flushing = false;
-    };
-    const crumbTimer = setInterval(() => void flushCrumbs(), 6000);
-
-    // warn about saved hazards ahead, and settle each one as the rider passes it
+    // choose the target, and fire the voice cues
     const tick = setInterval(() => {
-      if (stopped || live.current.paused || !pos) return;
-      if (!lastFetch || Date.now() - lastFetch.at > 30000 || meters(lastFetch, pos) > lastFetch.r / 4) void refreshNearby();
+      const p = posRef.current;
+      if (stopped || live.current.paused || !p) return;
+      if (!lastFetch || Date.now() - lastFetch.at > 30000 || meters(lastFetch, p) > 150) void refreshTargets();
 
-      if (current) {
-        const k = known.get(current.id);
-        const d = k ? meters(pos, k) : Infinity;
-        if (k && d < current.minD) current.minD = d;
-        const passed = !k || d > current.minD + Math.max(8, pos.speed * 1.5) || d > current.warnM + 40;
-        if (!passed) { setDistance(Math.max(0, Math.round((d * FT) / 5) * 5)); return; }
-        const done = current;
-        current = null; setUpcoming(null);
-        // reached it but the camera never confirmed it: ask the server to judge the latest frame
-        if (k && done.minD < Math.max(PASS_M, pos.speed * 2) && !resolved.has(done.id) && lastFrame) { const f = lastFrame; void send("/api/pass", f.blob, { potholeId: done.id }).then((e) => emit(e, f)); }
-        return;
+      const acc = p.accuracy ?? 10;
+      const arriveM = Math.min(60, Math.max(40, acc + 20));
+
+      // candidates: the chosen route, in order, or else whatever 311 spots are nearby
+      {
+        const candidates = missionStops.length ? missionStops : spotsRef.current;
+        const open = candidates.filter((c) => !doneSet.current.has(c.id));
+        const score = (c: Spot) => meters(p, c) + (c.photos ?? 0) * 400;
+        const pick = missionStops.length ? open[0] : [...open].sort((a, b) => score(a) - score(b))[0];
+
+        if (skipRequested.current && pick) { skipRequested.current = false; doneSet.current.add(pick.id); }
+        let chosen: Spot | undefined = pick;
+        if (chosen && doneSet.current.has(chosen.id)) chosen = missionStops.length ? open.filter((c) => !doneSet.current.has(c.id))[0] : [...open].filter((c) => !doneSet.current.has(c.id)).sort((a, b) => score(a) - score(b))[0];
+
+        // a spot is finished once this pass has added enough photos to it
+        if (chosen && (photosAt.current.get(chosen.id) ?? 0) >= NEEDED) { doneSet.current.add(chosen.id); chosen = undefined; }
+
+        if (!chosen) {
+          if (targetIdRef.current !== null) { targetIdRef.current = null; live.current.onNext(null); }
+          setTarget(null);
+        } else {
+          const d = meters(p, chosen);
+          if (targetIdRef.current !== chosen.id) {
+            if (targetIdRef.current !== null || doneSet.current.size) live.current.onNext(chosen.place);
+            targetIdRef.current = chosen.id;
+          }
+          const atSpot = d <= arriveM;
+          if (d <= 160 && !atSpot && !warnedClose.has(chosen.id)) { warnedClose.add(chosen.id); live.current.onTargetClose(chosen.place); }
+          if (atSpot && !warnedAt.has(chosen.id)) { warnedAt.add(chosen.id); live.current.onAtSpot(chosen.place); }
+          setTarget({ ...chosen, meters: d, bearing: bearing(p, chosen), atSpot, photosHere: photosAt.current.get(chosen.id) ?? 0, needed: NEEDED });
+          setDistanceM(d);
+        }
       }
 
-      const warnM = warnDistance(pos.speed);
-      // a stop on the suggested photo route is coming up: say so once (the camera does the rest)
-      for (const s of stops) if (!announced.has(s.id) && meters(pos, s) <= warnM) { announced.add(s.id); live.current.onStop(s.place); }
-      let best: { k: Known; d: number } | null = null;
-      for (const k of known.values()) {
-        if (warned.has(k.id)) continue;
-        const d = meters(pos, k);
-        // below walking pace the heading is noise, so only distance counts
-        const ahead = pos.heading == null || pos.speed < 1 || angleDiff(bearing(pos, k), pos.heading) < 45 || d < 12;
-        if (d <= warnM && ahead && (!best || d < best.d)) best = { k, d };
-      }
-      if (best) {
-        warned.add(best.k.id);
-        current = { id: best.k.id, minD: best.d, warnM };
-        const u: Upcoming = { id: best.k.id, hazard: toHazard(best.k.kind), street: best.k.street, lane: best.k.lane, severity: toSev(best.k.severity) ?? 2, startFt: Math.max(10, Math.round(best.d * FT)) };
-        setUpcoming(u); setDistance(u.startFt); live.current.onAhead(u);
-      }
-    }, 300);
+      // "pothole near you": the nearest known spot or hazard that isn't the target
+      const alertM = Math.min(220, Math.max(90, p.speed * 12));
+      let best: NearAlert | null = null;
+      const consider = (id: string, place: string, lat: number, lng: number) => {
+        if (id === targetIdRef.current) return;
+        const d = meters(p, { lat, lng });
+        if (d <= alertM && (!best || d < best.meters)) best = { id, place, meters: d, bearing: bearing(p, { lat, lng }) };
+      };
+      spotsRef.current.forEach((c) => consider(c.id, c.place, c.lat, c.lng));
+      hazardsRef.current.forEach((c) => consider(`h${c.id}`, c.place, c.lat, c.lng));
+      const found = best as NearAlert | null;
+      if (found && !warnedNear.has(found.id)) { warnedNear.add(found.id); live.current.onNear(found.place); }
+      setAlert(found);
+    }, 400);
 
     // take a frame on a steady beat; up to MAX_IN_FLIGHT are checked at once
     const frameTimer = setInterval(async () => {
       const video = videoRef.current;
-      if (stopped || live.current.paused || !ride || !pos || !video || inFlight >= MAX_IN_FLIGHT || document.hidden) return;
+      if (stopped || live.current.paused || !ride || !posRef.current || !video || inFlight >= MAX_IN_FLIGHT || document.hidden) return;
       inFlight++;
       try {
         const { blob, luma, aspect } = await grabFrame(video, canvas, tiny);
-        if (blob) { const f = { blob, aspect }; live.current.onLuma(luma); lastFrame = f; emit(await send("/api/scan", blob), f); }
+        if (blob) { const f = { blob, aspect }; live.current.onLuma(luma); emit(await send(blob), f); }
       } finally { inFlight--; }
     }, FRAME_MS);
 
     return () => {
       stopped = true;
-      clearInterval(tick); clearInterval(frameTimer); clearInterval(crumbTimer); clearInterval(rideTimer);
+      clearInterval(tick); clearInterval(frameTimer); clearInterval(rideTimer);
       if (watch != null) navigator.geolocation.clearWatch(watch);
-      setUpcoming(null); setGps("waiting"); setMeters(0);
+      setTarget(null); setAlert(null); setGps("waiting"); setPos(null);
+      posRef.current = null;
       const r = ride;
-      if (r) {
-        // last breadcrumbs, then close the ride
-        const points = crumbs.slice(0, 80);
-        const post = (url: string, body: unknown) => fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), keepalive: true }).catch(() => {});
-        void (points.length ? post("/api/track", { rideId: r.rideId, token: r.token, points }) : Promise.resolve()).then(() => post(`/api/rides/${r.rideId}/end`, { token: r.token }));
-      }
+      if (r) void fetch(`/api/rides/${r.rideId}/end`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: r.token }), keepalive: true }).catch(() => {});
     };
   }, [active, videoRef]);
 
-  return { upcoming, distance, gps, online, meters: meters_ };
+  return { pos, gps, online, spots, hazards, stops, target, alert, distanceM, skip, skipTick };
 }

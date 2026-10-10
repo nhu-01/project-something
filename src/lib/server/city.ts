@@ -57,31 +57,67 @@ export async function syncCityReports() {
       chunk.flat(),
     );
   }
-  // anything older than the window that we still hold as open has aged out of the feed: stop showing it
-  await query(`UPDATE city_reports SET status='Closed' WHERE status <> 'Closed' AND created_at < now() - ($1 || ' days')::interval`, [String(DAYS)]);
-  const [open] = await query<{ n: number }>("SELECT COUNT(*)::int AS n FROM city_reports WHERE status <> 'Closed' AND pothole_id IS NULL");
-  return { fetched: rows.length, kept, skippedUnsafe, openUnphotographed: open.n };
+  // reports that have aged out of the feed and were never photographed: stop showing them. Ones with photos stay.
+  await query(`UPDATE city_reports SET status='Closed' WHERE status <> 'Closed' AND photo_count = 0 AND created_at < now() - ($1 || ' days')::interval`, [String(DAYS)]);
+  const [open] = await query<{ n: number; photographed: number }>("SELECT COUNT(*)::int AS n, COUNT(*) FILTER (WHERE photo_count > 0)::int AS photographed FROM city_reports WHERE status <> 'Closed'");
+  return { fetched: rows.length, kept, skippedUnsafe, open: open.n, photographed: open.photographed };
 }
 
-export type CityReport = { id: string; lat: number; lng: number; place: string; borough: string; createdAt: string; status: string };
-type Row = { id: string; lat: number; lng: number; place: string; borough: string; created_at: string | Date; status: string };
-const shape = (r: Row): CityReport => ({ id: r.id, lat: r.lat, lng: r.lng, place: r.place, borough: r.borough, createdAt: new Date(r.created_at).toISOString(), status: r.status });
-const OPEN = "status <> 'Closed' AND pothole_id IS NULL";
+export type CityReport = {
+  id: string; lat: number; lng: number; place: string; borough: string; createdAt: string; status: string;
+  photoCount: number; lastPhotoAt: string | null; kind: string | null; severity: number | null; size: string | null; lane: string | null; cover: string | null;
+};
+type Row = {
+  id: string; lat: number; lng: number; place: string; borough: string; created_at: string | Date; status: string;
+  photo_count: number; last_photo_at: string | Date | null; kind: string | null; severity: number | null; size: string | null; lane: string | null; cover: string | null;
+};
+const COLS = `r.id, r.lat, r.lng, r.place, r.borough, r.created_at, r.status, r.photo_count, r.last_photo_at, r.kind, r.severity, r.size, r.lane,
+  (SELECT p.photo FROM city_photos p WHERE p.report_id = r.id AND p.present AND p.photo IS NOT NULL ORDER BY p.at DESC LIMIT 1) AS cover`;
+const shape = (r: Row): CityReport => ({
+  id: r.id, lat: r.lat, lng: r.lng, place: r.place, borough: r.borough, createdAt: new Date(r.created_at).toISOString(), status: r.status,
+  photoCount: r.photo_count, lastPhotoAt: r.last_photo_at ? new Date(r.last_photo_at).toISOString() : null,
+  kind: r.kind, severity: r.severity, size: r.size, lane: r.lane, cover: r.cover,
+});
+const OPEN = "r.status <> 'Closed'";
 
-// City reports nobody has photographed yet.
+// Every open 311 pothole report, photographed or not.
 export async function openCityReports(): Promise<CityReport[]> {
-  return (await query<Row>(`SELECT id, lat, lng, place, borough, created_at, status FROM city_reports WHERE ${OPEN} ORDER BY created_at DESC LIMIT 3000`)).map(shape);
+  return (await query<Row>(`SELECT ${COLS} FROM city_reports r WHERE ${OPEN} ORDER BY r.created_at DESC LIMIT 4000`)).map(shape);
 }
 
 export async function cityReportsNear(lat: number, lng: number, radiusM: number): Promise<(CityReport & { meters: number })[]> {
   const [a, b, c, d] = bbox(lat, lng, radiusM);
-  const rows = await query<Row>(`SELECT id, lat, lng, place, borough, created_at, status FROM city_reports WHERE ${OPEN} AND lat BETWEEN $1 AND $2 AND lng BETWEEN $3 AND $4`, [a, b, c, d]);
+  const rows = await query<Row>(`SELECT ${COLS} FROM city_reports r WHERE ${OPEN} AND r.lat BETWEEN $1 AND $2 AND r.lng BETWEEN $3 AND $4`, [a, b, c, d]);
   return rows.map((r) => ({ ...shape(r), meters: meters(lat, lng, r.lat, r.lng) })).filter((r) => r.meters <= radiusM).sort((x, y) => x.meters - y.meters);
 }
 
-// A rider's camera just confirmed a hazard: if the city has a report right here, tie them together.
-export async function linkCityReport(potholeId: number, lat: number, lng: number) {
-  const [near] = await cityReportsNear(lat, lng, 60);
-  if (near) await query("UPDATE city_reports SET pothole_id=$2 WHERE id=$1", [near.id, potholeId]);
-  return near ?? null;
+export type CityPhoto = { id: string; at: string; rider: string | null; photo: string | null; present: boolean; severity: number | null; note: string };
+
+// One 311 report with its whole photo history, newest first.
+export async function cityReportWithPhotos(id: string): Promise<(CityReport & { photos: CityPhoto[] }) | null> {
+  const [r] = await query<Row>(`SELECT ${COLS} FROM city_reports r WHERE r.id = $1`, [id]);
+  if (!r) return null;
+  const photos = await query<{ id: string | number; at: string | Date; rider: string | null; photo: string | null; present: boolean; severity: number | null; note: string }>(
+    "SELECT id, at, rider, photo, present, severity, note FROM city_photos WHERE report_id = $1 ORDER BY at DESC LIMIT 200", [id],
+  );
+  return { ...shape(r), photos: photos.map((p) => ({ id: String(p.id), at: new Date(p.at).toISOString(), rider: p.rider, photo: p.photo, present: p.present, severity: p.severity, note: p.note })) };
+}
+
+type NewPhoto = { reportId: string; rideId: string; rider: string; photo: string | null; present: boolean; severity: number | null; note: string; lat: number; lng: number };
+
+// Adds a photo (or a "nothing found here") to a 311 report and refreshes the report's latest read of the spot.
+export async function addCityPhoto(p: NewPhoto, read?: { kind: string; severity: number | null; size: string | null; lane: string }) {
+  await query(
+    "INSERT INTO city_photos (report_id, ride_id, rider, photo, present, severity, note, lat, lng) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+    [p.reportId, p.rideId, p.rider, p.photo, p.present, p.severity, p.note, p.lat, p.lng],
+  );
+  if (p.present && p.photo) {
+    await query(
+      `UPDATE city_reports SET photo_count = photo_count + 1, last_photo_at = now(),
+         kind = COALESCE($2, kind), severity = COALESCE($3, severity), size = COALESCE($4, size), lane = COALESCE($5, lane) WHERE id = $1`,
+      [p.reportId, read?.kind ?? null, read?.severity ?? null, read?.size ?? null, read?.lane ?? null],
+    );
+  } else {
+    await query("UPDATE city_reports SET last_photo_at = now() WHERE id = $1", [p.reportId]);
+  }
 }

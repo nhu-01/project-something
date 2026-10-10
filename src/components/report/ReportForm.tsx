@@ -11,7 +11,7 @@ import type { Key } from "@/lib/i18n";
 type Place = { label: string; lat: number; lng: number };
 type Spot = { lat: number; lng: number; label: string };
 type Outcome =
-  | { ok: true; event: { kind: string; potholeId: string; hazard: string; street: string; lane: string; severity: number | null }; photoKept: boolean }
+  | { ok: true; event: { kind: string; potholeId: string; hazard: string; street: string; lane: string; severity: number | null }; photoKept: boolean; to311?: { id: string; place: string } }
   | { ok: false; reason: string };
 
 const REASONS = new Set(["no_hazard", "picture", "not_rideable"]);
@@ -102,11 +102,11 @@ export default function ReportForm() {
     const sev = e.severity ? (Math.min(5, Math.max(1, Math.round(e.severity))) as Severity) : null;
     return (
       <div className="card p-6" role="status">
-        <p className="eyebrow">{e.kind === "new" ? t("report.added") : t("report.addedExisting")}</p>
+        <p className="eyebrow">{outcome.to311 ? t("report.addedExisting") : e.kind === "new" ? t("report.added") : t("report.addedExisting")}</p>
         <h2 className="mt-2 flex items-center gap-3 text-2xl font-medium tracking-tight">{sev && <SeverityBullet value={sev} large />}{t(`hazard.${["pothole", "bump", "rough"].includes(e.hazard) ? e.hazard : "pothole"}` as Key)} · {e.street}</h2>
-        <p className="mt-2 text-muted">{e.kind === "new" ? t("report.addedBody") : t("report.existingBody")}{!outcome.photoKept && ` ${t("report.photoNotKept")}`}</p>
+        <p className="mt-2 text-muted">{outcome.to311 ? t("report.to311", { place: outcome.to311.place }) : e.kind === "new" ? t("report.addedBody") : t("report.existingBody")}{!outcome.photoKept && ` ${t("report.photoNotKept")}`}</p>
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link href={`/potholes/${e.potholeId}`} className="pill pill-ink">{t("report.seeIt")} <ArrowUpRight /></Link>
+          <Link href={outcome.to311 ? `/spots/${outcome.to311.id}` : `/potholes/${e.potholeId}`} className="pill pill-ink">{t("report.seeIt")} <ArrowUpRight /></Link>
           <button onClick={reset} className="pill pill-line">{t("report.another")}</button>
         </div>
       </div>

@@ -6,7 +6,7 @@ import { ArrowUpRight, Close, Volume } from "@/components/ui/Icons";
 import { useI18n } from "@/lib/i18n/client";
 import type { Key } from "@/lib/i18n";
 import { LANG_CODES, LANGS, type Lang } from "@/lib/voice";
-import Destination from "./Destination";
+import Destination, { type PlannedRoute } from "./Destination";
 
 const CHECKS = ["ride.check1", "ride.check2", "ride.check3"] as const;
 
@@ -15,7 +15,7 @@ type Props = {
   lang: Lang; onLang: (l: Lang) => void;
   voice: "f" | "m"; onVoice: (v: "f" | "m") => void;
   onHearGuide: () => void;
-  onRoute: (count: number | null, label: string | null) => void;
+  onRoute: (route: PlannedRoute | null) => void;
 };
 
 // Setup, shown as a pop-up over the live camera: destination search on top, safety checks and voice choices below.

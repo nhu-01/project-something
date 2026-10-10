@@ -78,3 +78,43 @@ CREATE TABLE IF NOT EXISTS city_reports (
   synced_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS city_reports_geo ON city_reports (lat, lng);
+
+-- 311 reports are the main subject now: each one collects many photos from many riders (like Austin's and Boston's
+-- public ticket pages), plus the latest read of what's there.
+ALTER TABLE city_reports ADD COLUMN IF NOT EXISTS kind TEXT;
+ALTER TABLE city_reports ADD COLUMN IF NOT EXISTS severity INT;
+ALTER TABLE city_reports ADD COLUMN IF NOT EXISTS size TEXT;
+ALTER TABLE city_reports ADD COLUMN IF NOT EXISTS lane TEXT;
+ALTER TABLE city_reports ADD COLUMN IF NOT EXISTS photo_count INT NOT NULL DEFAULT 0;
+ALTER TABLE city_reports ADD COLUMN IF NOT EXISTS last_photo_at TIMESTAMPTZ;
+ALTER TABLE potholes ADD COLUMN IF NOT EXISTS city_report_id TEXT;
+
+CREATE TABLE IF NOT EXISTS city_photos (
+  id                 BIGSERIAL PRIMARY KEY,
+  report_id          TEXT NOT NULL,
+  at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ride_id            TEXT,
+  rider              TEXT,
+  photo              TEXT,
+  present            BOOLEAN NOT NULL,          -- false: a rider stood here and the camera found nothing
+  severity           INT,
+  note               TEXT NOT NULL DEFAULT '',
+  lat                DOUBLE PRECISION,
+  lng                DOUBLE PRECISION,
+  legacy_sighting_id BIGINT UNIQUE              -- set when the photo was carried over from a linked rider hazard
+);
+CREATE INDEX IF NOT EXISTS city_photos_report ON city_photos (report_id, at DESC);
+
+-- Earlier versions tied a rider hazard to a nearby 311 report. Carry those photos over to the report and hide the
+-- now-duplicate hazard (merged_into = -1). Safe to run every time.
+INSERT INTO city_photos (report_id, at, ride_id, rider, photo, present, severity, note, lat, lng, legacy_sighting_id)
+  SELECT c.id, s.at, s.ride_id, s.rider, s.photo, (s.kind NOT IN ('not_found', 'repaired')), s.severity, s.note, s.lat, s.lng, s.id
+  FROM city_reports c JOIN sightings s ON s.pothole_id = c.pothole_id
+  WHERE c.pothole_id IS NOT NULL
+  ON CONFLICT DO NOTHING;
+UPDATE potholes SET merged_into = -1, city_report_id = (SELECT c.id FROM city_reports c WHERE c.pothole_id = potholes.id LIMIT 1)
+  WHERE merged_into IS NULL AND id IN (SELECT pothole_id FROM city_reports WHERE pothole_id IS NOT NULL);
+UPDATE city_reports c SET
+  photo_count = (SELECT COUNT(*) FROM city_photos p WHERE p.report_id = c.id AND p.present AND p.photo IS NOT NULL),
+  last_photo_at = (SELECT MAX(at) FROM city_photos p WHERE p.report_id = c.id)
+  WHERE EXISTS (SELECT 1 FROM city_photos p WHERE p.report_id = c.id);

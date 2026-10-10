@@ -2,7 +2,7 @@
 import { useReducedMotion } from "motion/react";
 import { useMedia } from "@/lib/useMedia";
 import { useI18n } from "@/lib/i18n/client";
-import type { Key } from "@/lib/i18n";
+import { plural } from "@/lib/i18n";
 import { pointAt, ROUTE_D } from "./routeMath";
 
 // One looping story in a single SVG (SMIL, so it scales and stays in sync):
@@ -11,10 +11,10 @@ const CYCLE = 16;
 const R1_END = 0.4; // rider 1 occupies 0 to 40% of the cycle
 const R2_START = 0.5, R2_END = 0.9;
 const HOLES = [
-  { f: 0.16, sev: 3 },
-  { f: 0.46, sev: 4 },
-  { f: 0.72, sev: 1 },
-  { f: 0.9, sev: 3 },
+  { f: 0.16, n: 1 },
+  { f: 0.46, n: 2 },
+  { f: 0.72, n: 1 },
+  { f: 0.9, n: 3 },
 ];
 
 const seq = (a: number[]) => a.map((n) => n.toFixed(4)).join(";");
@@ -57,7 +57,7 @@ export default function HeroScene() {
         const s1 = R1_END * h.f; // rider 1 reaches it
         const s2 = R2_START + (R2_END - R2_START) * h.f; // rider 2 reaches it
         const warnAt = Math.max(R2_START + 0.005, s2 - 0.055);
-        const label = `${t("home.aheadLabel")} · ${t(`sev.${h.sev}` as Key)}`;
+        const label = plural(t, "home.heroSpot", h.n);
         const labelW = [...label].length * fs * 0.62 + 30;
         return (
           <g key={i}>

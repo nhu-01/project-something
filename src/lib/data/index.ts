@@ -1,7 +1,6 @@
 import "server-only";
 import { query } from "@/lib/server/db";
-import { meters } from "@/lib/server/geo";
-import type { CityReport, Pothole, Severity, Sighting, SightingKind, Stats, Status, Track } from "./types";
+import type { CityReport, CityReportDetail, Pothole, Severity, Sighting, SightingKind, Stats, Status } from "./types";
 
 // The only place pages read potholes from. Everything here is real rider data from the database.
 type PRow = {
@@ -42,81 +41,49 @@ export async function getPothole(id: string): Promise<Pothole | null> {
   return shape(p, await query<SRow>("SELECT id, pothole_id, at, rider, kind, severity, note, photo FROM sightings WHERE pothole_id=$1 ORDER BY at ASC", [p.id]));
 }
 
-// Hide the start and end of every ride, so tracks don't point at anyone's home: 12% of the ride at each end,
-// at least 25 m and at most 150 m.
-const trimFor = (lengthM: number) => Math.min(150, Math.max(25, lengthM * 0.12));
-const GAP_M = 400; // a jump this big between breadcrumbs is a GPS glitch or a pause (fast riders legitimately cover ~30 m/s)
+type CityLike = Awaited<ReturnType<typeof import("@/lib/server/city").openCityReports>>[number];
+const asCity = (r: CityLike): CityReport => ({ ...r, kind: r.kind === "bump" || r.kind === "rough" ? r.kind : r.kind ? "pothole" : null, severity: sev(r.severity), size: r.size === "small" || r.size === "medium" || r.size === "large" ? r.size : null });
 
-// Where the app has been ridden in the last `days` days, as anonymous line segments.
-export async function getTracks(days = 30): Promise<Track[]> {
-  const rows = await query<{ ride_id: string; lat: number; lng: number }>(
-    `SELECT ride_id, lat, lng FROM ride_points WHERE at > now() - ($1 || ' days')::interval ORDER BY ride_id, at LIMIT 400000`,
-    [String(days)],
-  );
-  const byRide = new Map<string, [number, number][]>();
-  for (const r of rows) (byRide.get(r.ride_id) ?? byRide.set(r.ride_id, []).get(r.ride_id)!).push([r.lat, r.lng]);
-
-  const tracks: Track[] = [];
-  for (const pts of byRide.values()) {
-    if (pts.length < 2) continue;
-    const first = pts[0], last = pts[pts.length - 1];
-    const length = pts.slice(1).reduce((d, p, i) => d + meters(pts[i][0], pts[i][1], p[0], p[1]), 0);
-    const trim = trimFor(length);
-    const kept = pts.filter((p) => meters(p[0], p[1], first[0], first[1]) > trim && meters(p[0], p[1], last[0], last[1]) > trim);
-    let seg: Track = [];
-    for (const p of kept) {
-      const prev = seg[seg.length - 1];
-      const step = prev ? meters(prev[0], prev[1], p[0], p[1]) : Infinity;
-      if (prev && step > GAP_M) { if (seg.length > 1) tracks.push(seg); seg = []; }
-      else if (prev && step < 12) continue; // closer than this adds nothing you can see on the map
-      seg.push(p);
-    }
-    if (seg.length > 1) tracks.push(seg);
-  }
-  return tracks;
-}
-
-export const trackMiles = (tracks: Track[]) =>
-  tracks.reduce((sum, t) => sum + t.slice(1).reduce((d, p, i) => d + meters(t[i][0], t[i][1], p[0], p[1]), 0), 0) / 1609.344;
-
-// 311 pothole reports with no rider photo yet (real city records, shown as their own layer).
+// Every open 311 pothole report, with how many rider photos it has.
 export async function getCityReports(): Promise<CityReport[]> {
   const { openCityReports } = await import("@/lib/server/city");
-  return openCityReports();
+  return (await openCityReports()).map(asCity);
+}
+
+// One 311 report with its whole photo history.
+export async function getCityReport(id: string): Promise<CityReportDetail | null> {
+  if (!/^\d{5,12}$/.test(id)) return null;
+  const { cityReportWithPhotos } = await import("@/lib/server/city");
+  const r = await cityReportWithPhotos(id);
+  return r ? { ...asCity(r), photos: r.photos.map((p) => ({ ...p, severity: sev(p.severity) })) } : null;
 }
 
 export async function getStats(): Promise<Stats> {
-  const [t] = await query<{ tracked: number; open: number; repaired: number; new_week: number; repaired_week: number }>(
-    `SELECT COUNT(*)::int AS tracked,
-            COUNT(*) FILTER (WHERE status='open')::int AS open,
-            COUNT(*) FILTER (WHERE status='repaired')::int AS repaired,
-            COUNT(*) FILTER (WHERE first_seen > now() - interval '7 days')::int AS new_week,
-            COUNT(*) FILTER (WHERE status='repaired' AND last_seen > now() - interval '7 days')::int AS repaired_week
-     FROM potholes WHERE merged_into IS NULL`,
+  const [t] = await query<{ tracked: number; new_week: number }>(
+    `SELECT COUNT(*)::int AS tracked, COUNT(*) FILTER (WHERE first_seen > now() - interval '7 days')::int AS new_week FROM potholes WHERE merged_into IS NULL`,
   );
-  // Only real rides: started from the ride screen and with GPS breadcrumbs. Photo reports and empty sessions don't count.
-  const [r] = await query<{ n: number }>(
-    "SELECT COUNT(*)::int AS n FROM rides r WHERE r.source = 'ride' AND r.started_at > now() - interval '7 days' AND EXISTS (SELECT 1 FROM ride_points p WHERE p.ride_id = r.id)",
-  );
-  const days = await query<{ day: string | Date; found: number; repaired: number }>(
-    `SELECT date_trunc('day', at) AS day,
-            COUNT(*) FILTER (WHERE kind='first_seen')::int AS found,
-            COUNT(*) FILTER (WHERE kind='repaired')::int AS repaired
-     FROM sightings WHERE at > now() - interval '14 days' GROUP BY 1`,
-  );
-  const dayKey = (d: Date) => d.toISOString().slice(0, 10);
-  const byDay = new Map(days.map((d) => [dayKey(new Date(d.day)), d]));
+  const [r] = await query<{ n: number }>("SELECT COUNT(DISTINCT ride_id)::int AS n FROM city_photos WHERE at > now() - interval '7 days'");
+  const [c] = await query<{ spots: number; photographed: number; photos: number }>(
+    "SELECT COUNT(*)::int AS spots, COUNT(*) FILTER (WHERE photo_count > 0)::int AS photographed, COALESCE(SUM(photo_count),0)::int AS photos FROM city_reports WHERE status <> 'Closed'");
+
+  const photoDays = await query<{ day: string | Date; n: number }>(
+    "SELECT date_trunc('day', at) AS day, COUNT(*)::int AS n FROM city_photos WHERE present AND photo IS NOT NULL AND at > now() - interval '14 days' GROUP BY 1");
+  const reportDays = await query<{ day: string | Date; n: number }>(
+    "SELECT date_trunc('day', first_seen) AS day, COUNT(*)::int AS n FROM potholes WHERE merged_into IS NULL AND first_seen > now() - interval '14 days' GROUP BY 1");
+  const key = (d: Date) => d.toISOString().slice(0, 10);
+  const p = new Map(photoDays.map((d) => [key(new Date(d.day)), d.n]));
+  const rp = new Map(reportDays.map((d) => [key(new Date(d.day)), d.n]));
   const daily = Array.from({ length: 14 }, (_, i) => {
     const d = new Date(Date.now() - (13 - i) * 86400000);
-    const hit = byDay.get(dayKey(d));
-    return { day: d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }), found: hit?.found ?? 0, repaired: hit?.repaired ?? 0 };
+    return { day: d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }), photos: p.get(key(d)) ?? 0, reports: rp.get(key(d)) ?? 0 };
   });
-  const worst = await query<{ street: string; borough: string; open: number; avg: number }>(
-    `SELECT street, MIN(borough) AS borough, COUNT(*)::int AS open, AVG(severity)::float AS avg
-     FROM potholes WHERE status='open' AND merged_into IS NULL AND severity IS NOT NULL GROUP BY street ORDER BY AVG(severity) * COUNT(*) DESC LIMIT 5`,
-  );
+
+  const top = await query<{ id: string; place: string; borough: string; photos: number }>(
+    "SELECT id, place, borough, photo_count AS photos FROM city_reports WHERE status <> 'Closed' AND photo_count > 0 ORDER BY photo_count DESC, last_photo_at DESC LIMIT 5");
+  const latest = await query<{ id: string; place: string; borough: string; at: string | Date }>(
+    "SELECT id, place, borough, last_photo_at AS at FROM city_reports WHERE last_photo_at IS NOT NULL ORDER BY last_photo_at DESC LIMIT 5");
   return {
-    tracked: t.tracked, open: t.open, repaired: t.repaired, ridesThisWeek: r.n, milesRidden: trackMiles(await getTracks(3650)), newThisWeek: t.new_week, repairedThisWeek: t.repaired_week, daily,
-    worstStreets: worst.map((w) => ({ street: w.street, borough: w.borough, open: w.open, avgSeverity: w.avg })),
+    tracked: t.tracked, newThisWeek: t.new_week, ridesThisWeek: r.n, citySpots: c.spots, cityPhotographed: c.photographed, cityPhotos: c.photos, daily,
+    topSpots: top, latest: latest.map((l) => ({ ...l, at: new Date(l.at).toISOString() })),
   };
 }

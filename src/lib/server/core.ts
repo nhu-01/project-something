@@ -4,12 +4,17 @@ import { judgeFrame, type Verdict } from "./gemini";
 import { bbox, directionWord, meters, reverseGeocode, validPoint } from "./geo";
 import { savePhoto } from "./storage";
 import { damageConfidence, stripPadding } from "./yolo";
-import { linkCityReport } from "./city";
+import { addCityPhoto, cityReportsNear } from "./city";
 
 // Phone GPS is only good to 5-20 m (worse between buildings), so anything this close to a known hazard is treated as
 // the same hazard. 15 m turned out to be too tight: a little drift made every visit log a "new" one.
 export const JOIN_RADIUS_M = 25;
 const joinRadius = (pos: Position) => Math.min(45, Math.max(JOIN_RADIUS_M, (pos.accuracy ?? 10) + 15));
+// 311 reports mark an intersection or an address, not the exact hole, so a frame within this distance of one counts
+// as that spot. (Wider than for rider hazards, and widened further when GPS is poor.)
+const cityRadius = (pos: Position) => Math.min(60, Math.max(40, (pos.accuracy ?? 10) + 20));
+const MAX_PHOTOS_PER_RIDE_SPOT = 4; // enough angles, not a flood from one pass
+const MIN_GAP_S = 3;
 // Hairline cracks and shallow dips (severity 1) are everywhere; logging each one buries the real hazards.
 const MIN_NEW_SEVERITY = Number(process.env.MIN_NEW_SEVERITY ?? 2);
 // The detector is only a cheap first pass, so its bar is deliberately low: Gemini makes the real call.
@@ -27,7 +32,11 @@ const isPicture = (v: Verdict) => v.screen_or_print && !allowScreens();
 export type ScanResult = { event: RideEventOut | null; hint?: "screen" };
 
 export type Position = { lat: number; lng: number; heading: number | null; accuracy: number | null };
-export type RideEventOut = { kind: "new" | "confirmed" | "worse" | "better" | "repaired"; potholeId: string; hazard: string; street: string; lane: string; severity: number | null };
+// source "311" events are photos added to a city report (id is the 311 number); "rider" events are hazards riders logged.
+export type RideEventOut = {
+  kind: "new" | "confirmed" | "worse" | "better" | "repaired" | "photo" | "not_found";
+  source: "rider" | "311"; potholeId: string; hazard: string; street: string; lane: string; severity: number | null; photoNumber?: number;
+};
 type Ride = { id: string; rider: string };
 type Known = { id: number; lat: number; lng: number; street: string; lane: string; severity: number | null; status: string; kind: string };
 
@@ -92,13 +101,43 @@ async function resight(ride: Ride, p: Known, v: Verdict, pos: Position, frame: B
   const photo = await photoFor(`${ride.id}-${p.id}.jpg`, frame, v);
   await record(ride, p.id, kind, v, pos, photo, yolo, v.note);
   await query("UPDATE potholes SET severity=$2, size=COALESCE($3,size), last_seen=now(), photo=COALESCE($4,photo) WHERE id=$1", [p.id, sev, v.size, photo]);
-  return { kind, potholeId: String(p.id), hazard: p.kind, street: p.street, lane: p.lane, severity: sev };
+  return { kind, source: "rider", potholeId: String(p.id), hazard: p.kind, street: p.street, lane: p.lane, severity: sev };
+}
+
+// A frame taken at a 311 report: the photo joins that report's gallery (many riders, many photos, like Austin and
+// Boston), and the report's latest read of the spot is refreshed.
+async function cityFrame(ride: Ride, report: { id: string; place: string }, frame: Buffer, pos: Position, yolo: number): Promise<ScanResult> {
+  const [stat] = await query<{ n: number; last: string | Date | null; missed: number }>(
+    "SELECT COUNT(*)::int AS n, MAX(at) AS last, COUNT(*) FILTER (WHERE NOT present)::int AS missed FROM city_photos WHERE report_id=$1 AND ride_id=$2", [report.id, ride.id]);
+  if (stat.n >= MAX_PHOTOS_PER_RIDE_SPOT) return { event: null };
+  if (stat.last && Date.now() - new Date(stat.last).getTime() < MIN_GAP_S * 1000) return { event: null };
+  if (yolo < KNOWN_HIT && !(await dueForLook(ride.id))) return { event: null };
+
+  const v = await judge(ride, frame);
+  if (isPicture(v)) return { event: null, hint: "screen" };
+  const base = { source: "311" as const, potholeId: report.id, street: report.place };
+  if (v.pothole_present) {
+    const photo = await photoFor(`${ride.id}-c${report.id}-${stat.n}.jpg`, frame, v);
+    await addCityPhoto({ reportId: report.id, rideId: ride.id, rider: ride.rider, photo, present: true, severity: v.severity, note: v.note, lat: pos.lat, lng: pos.lng },
+      { kind: hazardOf(v), severity: v.severity, size: v.size, lane: v.lane });
+    const [now] = await query<{ photo_count: number }>("SELECT photo_count FROM city_reports WHERE id=$1", [report.id]);
+    return { event: { ...base, kind: "photo", hazard: hazardOf(v), lane: v.lane, severity: v.severity, photoNumber: now?.photo_count } };
+  }
+  // Nothing visible: recorded at most once per ride, and only when the model is fairly sure.
+  if (v.confidence === "low" || stat.missed > 0) return { event: null };
+  const photo = await photoFor(`${ride.id}-c${report.id}-none.jpg`, frame, v);
+  await addCityPhoto({ reportId: report.id, rideId: ride.id, rider: ride.rider, photo, present: false, severity: null, note: v.note, lat: pos.lat, lng: pos.lng });
+  return { event: { ...base, kind: "not_found", hazard: "pothole", lane: v.lane, severity: null } };
 }
 
 // Called for each camera frame during a ride.
 export async function scanFrame(ride: Ride, frame: Buffer, pos: Position): Promise<ScanResult> {
   const yolo = await detect(ride, frame);
   if (!validPoint(pos.lat, pos.lng) || (pos.accuracy != null && pos.accuracy > 65)) return { event: null };
+
+  // At a 311 spot: the photo goes on that report.
+  const city = (await cityReportsNear(pos.lat, pos.lng, cityRadius(pos)))[0];
+  if (city) return cityFrame(ride, city, frame, pos, yolo);
 
   const near = (await nearbyOpen(pos.lat, pos.lng, joinRadius(pos))).sort((x, y) => meters(pos.lat, pos.lng, x.lat, x.lng) - meters(pos.lat, pos.lng, y.lat, y.lng))[0];
 
@@ -107,8 +146,15 @@ export async function scanFrame(ride: Ride, frame: Buffer, pos: Position): Promi
     if (yolo < KNOWN_HIT && !(await dueForLook(ride.id))) return { event: null };
     const v = await judge(ride, frame);
     if (isPicture(v)) return { event: null, hint: "screen" };
-    // absence is settled by passCheck when the rider leaves
-    return { event: v.pothole_present ? await resight(ride, near, v, pos, frame, yolo) : null };
+    if (v.pothole_present) return { event: await resight(ride, near, v, pos, frame, yolo) };
+    // a fresh patch where a rider-logged hazard used to be
+    if (v.repair_patch_visible && v.confidence !== "low") {
+      const photo = await photoFor(`${ride.id}-${near.id}.jpg`, frame, v);
+      await record(ride, near.id, "repaired", null, pos, photo, yolo, "a fresh patch where it used to be. looks repaired.");
+      await query("UPDATE potholes SET status='repaired', severity=NULL, last_seen=now(), photo=COALESCE($2,photo) WHERE id=$1", [near.id, photo]);
+      return { event: { kind: "repaired", source: "rider", potholeId: String(near.id), hazard: near.kind, street: near.street, lane: near.lane, severity: null } };
+    }
+    return { event: null };
   }
 
   if (yolo < NEW_HIT && !(await dueForLook(ride.id))) return { event: null };
@@ -128,36 +174,11 @@ export async function scanFrame(ride: Ride, frame: Buffer, pos: Position): Promi
   const photo = await photoFor(`${ride.id}-${row.id}.jpg`, frame, v);
   if (photo) await query("UPDATE potholes SET photo=$2 WHERE id=$1", [row.id, photo]);
   await record(ride, row.id, "first_seen", v, pos, photo, yolo, v.note);
-  await linkCityReport(row.id, pos.lat, pos.lng).catch(() => {}); // a matching 311 report now has its photo
-  return { event: { kind: "new", potholeId: String(row.id), hazard: hazardOf(v), street: place.street, lane: v.lane, severity: sev } };
-}
-
-// Called once when a rider has passed a known pothole without the camera confirming it.
-export async function passCheck(ride: Ride, potholeId: number, frame: Buffer, pos: Position): Promise<RideEventOut | null> {
-  const [p] = await query<Known>(`SELECT ${KNOWN_COLS} FROM potholes WHERE id=$1 AND status='open' AND merged_into IS NULL`, [potholeId]);
-  if (!p || (await alreadySeen(ride.id, p.id))) return null;
-  if (meters(pos.lat, pos.lng, p.lat, p.lng) > JOIN_RADIUS_M * 3) return null; // not actually near it
-
-  const yolo = await detect(ride, frame);
-  const v = await judge(ride, frame);
-  if (isPicture(v)) return null; // a picture says nothing about the real road, so record nothing
-  if (v.pothole_present) return resight(ride, p, v, pos, frame, yolo);
-
-  // Not visible. A repair patch, or two different riders in a row not finding it, counts as repaired.
-  const [prev] = await query<{ kind: string; ride_id: string }>("SELECT kind, ride_id FROM sightings WHERE pothole_id=$1 ORDER BY at DESC LIMIT 1", [p.id]);
-  const repaired = v.repair_patch_visible || (prev?.kind === "not_found" && prev.ride_id !== ride.id);
-  if (!repaired) {
-    await record(ride, p.id, "not_found", null, pos, null, yolo, "not visible on this pass.");
-    return null;
-  }
-  const photo = await photoFor(`${ride.id}-${p.id}.jpg`, frame, v);
-  await record(ride, p.id, "repaired", null, pos, photo, yolo, v.repair_patch_visible ? "a fresh patch where it used to be. looks repaired." : "not found by two riders in a row. looks repaired.");
-  await query("UPDATE potholes SET status='repaired', severity=NULL, last_seen=now(), photo=COALESCE($2,photo) WHERE id=$1", [p.id, photo]);
-  return { kind: "repaired", potholeId: String(p.id), hazard: p.kind, street: p.street, lane: p.lane, severity: null };
+  return { event: { kind: "new", source: "rider", potholeId: String(row.id), hazard: hazardOf(v), street: place.street, lane: v.lane, severity: sev } };
 }
 
 export type ReportResult =
-  | { ok: true; event: RideEventOut; photoKept: boolean }
+  | { ok: true; event: RideEventOut; photoKept: boolean; to311?: { id: string; place: string } }
   | { ok: false; reason: "no_hazard" | "picture" | "not_rideable" };
 
 // A photo someone submitted by hand, with a location they chose. No detector gate: Gemini always judges it.
@@ -167,6 +188,16 @@ export async function reportPhoto(ride: Ride, photo: Buffer, pos: Position): Pro
   if (isPicture(v)) return { ok: false, reason: "picture" };
   if (!v.pothole_present) return { ok: false, reason: "no_hazard" };
   if (!RIDEABLE.has(v.road_type)) return { ok: false, reason: "not_rideable" };
+
+  // A photo reported at a 311 spot joins that report's gallery.
+  const city = (await cityReportsNear(pos.lat, pos.lng, cityRadius(pos)))[0];
+  if (city) {
+    const url = await photoFor(`${ride.id}-c${city.id}.jpg`, photo, v);
+    await addCityPhoto({ reportId: city.id, rideId: ride.id, rider: ride.rider, photo: url, present: true, severity: v.severity, note: v.note, lat: pos.lat, lng: pos.lng },
+      { kind: hazardOf(v), severity: v.severity, size: v.size, lane: v.lane });
+    return { ok: true, photoKept: Boolean(url), to311: { id: city.id, place: city.place },
+      event: { kind: "photo", source: "311", potholeId: city.id, hazard: hazardOf(v), street: city.place, lane: v.lane, severity: v.severity } };
+  }
 
   const near = (await nearbyOpen(pos.lat, pos.lng, joinRadius(pos))).sort((x, y) => meters(pos.lat, pos.lng, x.lat, x.lng) - meters(pos.lat, pos.lng, y.lat, y.lng))[0];
   if (near) return { ok: true, event: await resight(ride, near, v, pos, photo, 0), photoKept: !v.people_or_plates };
@@ -182,6 +213,5 @@ export async function reportPhoto(ride: Ride, photo: Buffer, pos: Position): Pro
   const url = await photoFor(`${ride.id}-${row.id}.jpg`, photo, v);
   if (url) await query("UPDATE potholes SET photo=$2 WHERE id=$1", [row.id, url]);
   await record(ride, row.id, "first_seen", v, pos, url, null, v.note);
-  await linkCityReport(row.id, pos.lat, pos.lng).catch(() => {});
-  return { ok: true, event: { kind: "new", potholeId: String(row.id), hazard: hazardOf(v), street: place.street, lane: v.lane, severity: sev }, photoKept: Boolean(url) };
+  return { ok: true, event: { kind: "new", source: "rider", potholeId: String(row.id), hazard: hazardOf(v), street: place.street, lane: v.lane, severity: sev }, photoKept: Boolean(url) };
 }

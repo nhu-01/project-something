@@ -15,7 +15,6 @@ export async function GET() {
       `SELECT to_char(r.started_at, 'MM-DD HH24:MI') AS started,
               CASE WHEN r.ended_at IS NULL THEN NULL ELSE ROUND(EXTRACT(EPOCH FROM (r.ended_at - r.started_at)))::int END AS seconds,
               r.frames, ROUND(r.max_yolo::numeric, 2)::float AS max_yolo, r.gemini_calls,
-              (SELECT COUNT(*)::int FROM ride_points p WHERE p.ride_id = r.id) AS points,
               (SELECT COUNT(*)::int FROM sightings s WHERE s.ride_id = r.id) AS sightings
        FROM rides r ORDER BY r.started_at DESC LIMIT 12`,
     );

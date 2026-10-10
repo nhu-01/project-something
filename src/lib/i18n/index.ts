@@ -8,7 +8,7 @@ import pl from "./dicts/pl.json";
 import ru from "./dicts/ru.json";
 import zh from "./dicts/zh.json";
 import { en, type Key } from "./en";
-import { isLang, type Lang } from "@/lib/voice";
+import { isLang, type Lang } from "@/lib/langs";
 
 export type { Key };
 export type Dict = Record<Key, string>;
