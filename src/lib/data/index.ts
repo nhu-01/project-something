@@ -1,7 +1,7 @@
 import "server-only";
 import { query } from "@/lib/server/db";
 import { meters } from "@/lib/server/geo";
-import type { Pothole, Severity, Sighting, SightingKind, Stats, Status, Track } from "./types";
+import type { CityReport, Pothole, Severity, Sighting, SightingKind, Stats, Status, Track } from "./types";
 
 // The only place pages read potholes from. Everything here is real rider data from the database.
 type PRow = {
@@ -78,6 +78,12 @@ export async function getTracks(days = 30): Promise<Track[]> {
 
 export const trackMiles = (tracks: Track[]) =>
   tracks.reduce((sum, t) => sum + t.slice(1).reduce((d, p, i) => d + meters(t[i][0], t[i][1], p[0], p[1]), 0), 0) / 1609.344;
+
+// 311 pothole reports with no rider photo yet (real city records, shown as their own layer).
+export async function getCityReports(): Promise<CityReport[]> {
+  const { openCityReports } = await import("@/lib/server/city");
+  return openCityReports();
+}
 
 export async function getStats(): Promise<Stats> {
   const [t] = await query<{ tracked: number; open: number; repaired: number; new_week: number; repaired_week: number }>(

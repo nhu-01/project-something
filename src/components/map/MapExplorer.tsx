@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useMemo, useState } from "react";
 import { Search } from "@/components/ui/Icons";
-import type { Pothole, Track } from "@/lib/data/types";
+import type { CityReport, Mission, Pothole, Track } from "@/lib/data/types";
+import { CitySheet, MissionSheet } from "./CityPanels";
 import DetailSheet from "./DetailSheet";
 import MapClient from "./MapClient";
 
@@ -9,12 +10,19 @@ type StatusFilter = "all" | "open" | "repaired";
 const SEV_FILTERS = [{ label: "any severity", min: 1 }, { label: "3+ moderate", min: 3 }, { label: "4+ serious", min: 4 }];
 
 const NO_TRACKS: Track[] = [];
+const NO_CITY: CityReport[] = [];
+const MISSION_KEY = "spotholes-mission"; // read by the ride screen, so the route carries over
 
-export default function MapExplorer({ potholes, tracks }: { potholes: Pothole[]; tracks: Track[] }) {
+export default function MapExplorer({ potholes, tracks, city }: { potholes: Pothole[]; tracks: Track[]; city: CityReport[] }) {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [minSev, setMinSev] = useState(1);
   const [q, setQ] = useState("");
   const [showTracks, setShowTracks] = useState(true);
+  const [showCity, setShowCity] = useState(true);
+  const [cityId, setCityId] = useState<string | null>(null);
+  const [mission, setMission] = useState<Mission | null>(null);
+  const [planning, setPlanning] = useState(false);
+  const [planNote, setPlanNote] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const visible = useMemo(() => {
@@ -27,10 +35,31 @@ export default function MapExplorer({ potholes, tracks }: { potholes: Pothole[];
 
   const selected = visible.find((p) => p.id === selectedId) ?? null;
   const close = useCallback(() => setSelectedId(null), []);
+  const cityReport = showCity ? city.find((c) => c.id === cityId) ?? null : null;
+  const pickHazard = useCallback((id: string) => { setCityId(null); setSelectedId(id); }, []);
+  const pickCity = useCallback((id: string) => { setSelectedId(null); setMission(null); setCityId(id); }, []);
+
+  // Ask where the visitor is, then fetch a short route past nearby reports that have no photo.
+  const plan = () => {
+    setPlanning(true); setPlanNote(null);
+    if (!navigator.geolocation) { setPlanning(false); setPlanNote("this browser can't share your location."); return; }
+    navigator.geolocation.getCurrentPosition(async (p) => {
+      try {
+        const res = await fetch(`/api/mission?lat=${p.coords.latitude}&lng=${p.coords.longitude}`);
+        const m = (await res.json()) as Mission;
+        if (!res.ok || !m.stops?.length) { setPlanNote("no unphotographed 311 reports within about 3 miles of you right now."); return; }
+        setMission(m); setCityId(null); setSelectedId(null);
+        try { sessionStorage.setItem(MISSION_KEY, JSON.stringify(m.stops.map((s) => ({ id: s.id, lat: s.lat, lng: s.lng, place: s.place })))); } catch { /* storage blocked */ }
+      } catch { setPlanNote("couldn't build a route right now. please try again."); }
+      finally { setPlanning(false); }
+    }, () => { setPlanning(false); setPlanNote("turn on location to get a route near you."); }, { enableHighAccuracy: true, timeout: 12000 });
+  };
+  const clearMission = () => { setMission(null); try { sessionStorage.removeItem(MISSION_KEY); } catch { /* storage blocked */ } };
 
   return (
     <div className="map-shell relative h-[calc(100dvh-64px)] w-full">
-      <MapClient potholes={visible} tracks={showTracks ? tracks : NO_TRACKS} selectedId={selected?.id ?? null} onSelect={setSelectedId} />
+      <MapClient potholes={visible} tracks={showTracks ? tracks : NO_TRACKS} selectedId={selected?.id ?? null} onSelect={pickHazard}
+        city={showCity ? city : NO_CITY} onSelectCity={pickCity} mission={mission} />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[1000] flex flex-col gap-3 p-3 sm:p-4 md:max-w-[calc(100%-420px)]">
         <label className="pointer-events-auto flex h-12 max-w-md items-center gap-3 rounded-full border border-line bg-card/95 px-4 shadow-[0_6px_24px_rgb(32_33_30/0.08)] backdrop-blur">
@@ -50,6 +79,9 @@ export default function MapExplorer({ potholes, tracks }: { potholes: Pothole[];
           <button className="chip shadow-sm" aria-pressed={showTracks} onClick={() => setShowTracks((v) => !v)}>
             <span className="h-1 w-4 rounded-full bg-repaired" aria-hidden />ridden streets
           </button>
+          <button className="chip shadow-sm" aria-pressed={showCity} onClick={() => setShowCity((v) => !v)}>
+            <span className="h-3 w-3 rounded-full border-2 border-dashed border-current" aria-hidden />311 reports ({city.length})
+          </button>
         </div>
       </div>
 
@@ -57,7 +89,16 @@ export default function MapExplorer({ potholes, tracks }: { potholes: Pothole[];
         <span className="font-medium">{visible.length}</span><span className="text-muted">{potholes.length === 0 ? "potholes yet. be the first to ride." : "potholes shown"}</span>
       </div>
 
+      {!selected && !cityReport && !mission && city.length > 0 && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-16 z-[1000] flex flex-col items-center gap-2 px-3 sm:bottom-6">
+          {planNote && <p className="pointer-events-auto max-w-sm rounded-full border border-line bg-card/95 px-4 py-2 text-center text-sm backdrop-blur" role="status">{planNote}</p>}
+          <button onClick={plan} disabled={planning} className="pill pill-ink pointer-events-auto shadow-[0_10px_30px_rgb(32_33_30/0.25)] disabled:opacity-70">{planning ? "finding a route…" : "photo route near me"}</button>
+        </div>
+      )}
+
       <DetailSheet pothole={selected} onClose={close} />
+      {cityReport && <CitySheet report={cityReport} onClose={() => setCityId(null)} onPlan={plan} planning={planning} />}
+      {mission && <MissionSheet mission={mission} onClose={clearMission} />}
     </div>
   );
 }

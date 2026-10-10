@@ -15,6 +15,8 @@ Read `node_modules/next/dist/docs/` before using Next APIs: this version differs
 
 ## Rules
 - Pages get data only through `src/lib/data/` (server-only, reads the database). Never add sample or placeholder records.
+- NYC 311 pothole complaints (real city open data, synced daily by `/api/cron/city-sync`) are a separate map layer,
+  always labeled "reported to 311, no photo yet". They are never counted or styled as rider-verified hazards.
 - Local dev uses an embedded database and local photo files (`USE_LOCAL_DB=1`), so tests never touch live data. Don't test
   against production by creating hazards; use refusal paths or the local database.
 - Never put an API key or secret in browser code. Never commit `.env*`.

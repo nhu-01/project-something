@@ -3,10 +3,22 @@ import L from "leaflet";
 import "leaflet.markercluster";
 import { useEffect, useRef } from "react";
 import { escapeHtml } from "@/lib/escape";
-import type { Pothole, Track } from "@/lib/data/types";
+import type { CityReport, Mission, Pothole, Track } from "@/lib/data/types";
 import { SEV_WORD } from "@/lib/tokens";
 
-type Props = { potholes: Pothole[]; tracks: Track[]; selectedId: string | null; onSelect: (id: string) => void };
+type Props = {
+  potholes: Pothole[]; tracks: Track[]; selectedId: string | null; onSelect: (id: string) => void;
+  city: CityReport[]; onSelectCity: (id: string) => void; mission: Mission | null;
+};
+
+// A 311 report nobody has photographed yet: a hollow, dashed pin, so it never reads as a confirmed hazard.
+function cityIcon(r: CityReport) {
+  return L.divIcon({
+    className: "pin-wrap",
+    html: `<button type="button" class="pin pin--city" aria-label="${escapeHtml(`reported to 311 at ${r.place}, no photo yet`)}"><span class="pin-dot" aria-hidden="true">311</span></button>`,
+    iconSize: [44, 44], iconAnchor: [22, 22],
+  });
+}
 
 function pinIcon(p: Pothole, selected: boolean) {
   const sev = p.severity ?? 1;
@@ -18,11 +30,15 @@ function pinIcon(p: Pothole, selected: boolean) {
   });
 }
 
-export default function MapView({ potholes, tracks, selectedId, onSelect }: Props) {
+export default function MapView({ potholes, tracks, selectedId, onSelect, city, onSelectCity, mission }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const cluster = useRef<L.MarkerClusterGroup | null>(null);
   const trackLayer = useRef<L.LayerGroup | null>(null);
+  const cityCluster = useRef<L.MarkerClusterGroup | null>(null);
+  const missionLayer = useRef<L.LayerGroup | null>(null);
+  const onCityRef = useRef(onSelectCity);
+  useEffect(() => { onCityRef.current = onSelectCity; }, [onSelectCity]);
   const markers = useRef(new Map<string, { marker: L.Marker; data: Pothole }>());
   const onSelectRef = useRef(onSelect);
   const fitted = useRef(false);
@@ -34,9 +50,10 @@ export default function MapView({ potholes, tracks, selectedId, onSelect }: Prop
     if (!el) return;
     const m = L.map(el, { center: [40.7306, -73.9352], zoom: 11, zoomControl: false, scrollWheelZoom: false });
     L.control.zoom({ position: "bottomright" }).addTo(m);
-    // OpenStreetMap's standard tiles, in color (green parks, blue water). They need no API key.
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    // CyclOSM: a free, bike-focused map style (bike lanes and paths stand out). No API key needed.
+    L.tileLayer("https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png", {
+      maxZoom: 20, subdomains: "abc",
+      attribution: '<a href="https://www.cyclosm.org">CyclOSM</a> | &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(m);
     const group = L.markerClusterGroup({
       showCoverageOnHover: false, maxClusterRadius: 46,
@@ -49,6 +66,13 @@ export default function MapView({ potholes, tracks, selectedId, onSelect }: Prop
     // ridden streets sit under the pins; overlapping rides darken, like a heatmap
     m.createPane("tracks").style.zIndex = "350";
     trackLayer.current = L.layerGroup().addTo(m);
+    const cityGroup = L.markerClusterGroup({
+      showCoverageOnHover: false, maxClusterRadius: 60,
+      iconCreateFunction: (c) => L.divIcon({ className: "cluster-wrap", html: `<div class="cluster cluster--city" role="img" aria-label="${c.getChildCount()} 311 reports without photos, click to zoom in">${c.getChildCount()}</div>`, iconSize: [42, 42] }),
+    });
+    m.addLayer(cityGroup);
+    cityCluster.current = cityGroup;
+    missionLayer.current = L.layerGroup().addTo(m);
     // wheel zoom only after the map is clicked or focused, so the page never gets trapped
     m.on("click focus", () => m.scrollWheelZoom.enable());
     el.addEventListener("mouseleave", () => m.scrollWheelZoom.disable());
@@ -73,6 +97,25 @@ export default function MapView({ potholes, tracks, selectedId, onSelect }: Prop
       fitted.current = true;
     }
   }, [potholes]);
+
+  useEffect(() => {
+    const group = cityCluster.current;
+    if (!group) return;
+    group.clearLayers();
+    group.addLayers(city.map((r) => L.marker([r.lat, r.lng], { icon: cityIcon(r), keyboard: false, alt: "" }).on("click", () => onCityRef.current(r.id))));
+  }, [city]);
+
+  // the suggested photo route: a dashed line through numbered stops
+  useEffect(() => {
+    const layer = missionLayer.current, m = map.current;
+    if (!layer || !m) return;
+    layer.clearLayers();
+    if (!mission || !mission.stops.length) return;
+    const ink = getComputedStyle(document.documentElement).getPropertyValue("--ink").trim() || "#20211e";
+    L.polyline(mission.line, { color: ink, weight: 4, opacity: 0.85, dashArray: "2 9", lineCap: "round", interactive: false }).addTo(layer);
+    mission.stops.forEach((s, i) => L.marker([s.lat, s.lng], { interactive: false, keyboard: false, zIndexOffset: 1000, icon: L.divIcon({ className: "pin-wrap", html: `<span class="stop" aria-hidden="true">${i + 1}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(layer));
+    m.fitBounds(L.latLngBounds(mission.line as L.LatLngTuple[]), { padding: [70, 70], maxZoom: 16 });
+  }, [mission]);
 
   useEffect(() => {
     const layer = trackLayer.current, m = map.current;

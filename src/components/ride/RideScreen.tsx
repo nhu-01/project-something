@@ -86,7 +86,11 @@ export default function RideScreen() {
     const t = setInterval(check, 30000);
     return () => clearInterval(t);
   }, [riding, cameraState, torchSupported, torchOn, setTorch]);
-  const { upcoming, distance, gps, online, meters } = useRideEngine({ active: riding, paused, videoRef, onAhead, onResult, onHint, onLuma });
+  const onStop = useCallback((place: string) => {
+    setNotice(`reported spot ahead: ${place.toLowerCase()}. keep the camera on the road.`);
+    speech.say(cuePhrase(lang, "spot"), lang);
+  }, [speech, lang]);
+  const { upcoming, distance, gps, online, meters } = useRideEngine({ active: riding, paused, videoRef, onAhead, onResult, onHint, onLuma, onStop });
 
   // Say so the first time GPS locks on, so the rider knows it's working without looking.
   const gpsSaid = useRef(false);

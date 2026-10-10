@@ -63,3 +63,18 @@ ALTER TABLE rides ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'ride';
 -- survivor, and moved sightings remember where they came from.
 ALTER TABLE potholes ADD COLUMN IF NOT EXISTS merged_into INT;
 ALTER TABLE sightings ADD COLUMN IF NOT EXISTS orig_pothole_id INT;
+
+-- Pothole complaints from NYC 311 open data (real city records, synced daily). They are shown as a separate
+-- "reported to 311, no photo yet" layer and are never counted as rider-verified hazards.
+CREATE TABLE IF NOT EXISTS city_reports (
+  id          TEXT PRIMARY KEY,            -- 311 unique_key
+  created_at  TIMESTAMPTZ NOT NULL,
+  status      TEXT NOT NULL,               -- as reported by the city: Open, In Progress, Closed...
+  lat         DOUBLE PRECISION NOT NULL,
+  lng         DOUBLE PRECISION NOT NULL,
+  place       TEXT NOT NULL,               -- address or intersection, for display
+  borough     TEXT NOT NULL,
+  pothole_id  INT,                         -- set once a rider's camera confirms a hazard here
+  synced_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS city_reports_geo ON city_reports (lat, lng);
