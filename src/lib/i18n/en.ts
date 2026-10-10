@@ -25,7 +25,6 @@ export const en = {
   "home.swap.rough": "rough pavement",
   "home.seeMap": "see the map",
   "home.closing": "every photo helps the city see what's broken.",
-  "home.seeProgress": "see progress",
   "home.heroAlt": "animated sketch: one rider photographs a reported spot on the street; a second rider adds another picture of the same spot.",
   "home.caption1": "rider one photographs a reported spot.",
   "home.caption2": "rider two adds another angle.",

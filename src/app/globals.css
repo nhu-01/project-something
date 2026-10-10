@@ -116,7 +116,9 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
 .pin-wrap, .cluster-wrap { background: none; border: 0; }
 .pin { position: relative; display: grid; width: 44px; height: 44px; place-items: center; border: 0; background: none; cursor: pointer; }
 .pin-dot { display: grid; place-items: center; border-radius: 9999px; background: var(--paper); color: var(--ink); font-size: 13px; font-weight: 700; line-height: 1; border: 2px solid var(--pin-color); box-shadow: 0 4px 10px rgb(32 33 30 / 0.22); width: 28px; height: 28px; transition: transform 180ms var(--ease); }
-.pin-dot img { display: block; }
+.pin-dot img { display: block; width: 26px; height: 26px; max-width: none; object-fit: contain; }
+.pin--city .pin-dot img { width: 24px; height: 24px; }
+.ride-pin img { display: block; width: 18px; height: 18px; max-width: none; object-fit: contain; }
 .pin-grade { position: absolute; right: 0; bottom: 3px; display: grid; min-width: 19px; height: 19px; place-items: center; border-radius: 9999px; background: var(--pin-color); color: var(--pin-text, #fff); font-size: 11px; font-weight: 800; border: 2px solid var(--paper); line-height: 1; }
 .pin:hover .pin-dot { transform: scale(1.18); }
 .pin--selected .pin-dot { box-shadow: 0 0 0 2px var(--ink), 0 6px 14px rgb(32 33 30 / 0.3); transform: scale(1.2); }

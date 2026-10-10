@@ -55,7 +55,7 @@ export default async function Home() {
           <ScrollFillText text={t("home.closing")} className="h2 mx-auto max-w-[20ch]" />
           <div className="mt-8 flex justify-center gap-3">
             <SpotButton className="pill pill-ink">{t("nav.start")} <ArrowUpRight /></SpotButton>
-            <Link href="/stats" className="pill pill-line">{t("home.seeProgress")}</Link>
+            <Link href="/map" className="pill pill-line">{t("home.seeMap")}</Link>
           </div>
         </Reveal>
       </section>
