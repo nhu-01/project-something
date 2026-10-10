@@ -44,6 +44,11 @@ not green, so it is never confused with a severity. These are plain colored circ
 Hanken Grotesk everywhere (via `next/font`). Mostly lowercase. Display `clamp(40px, 7vw, 84px)`, weight 500, tracking -0.03em.
 Body 15 to 17px, line-height 1.6. Labels 12px, uppercase off, tracking 0.02em.
 
+## Sign-painter cues
+General street-sign feel only (no name, logo, slogan or likeness of any campaign): a tall condensed display face
+(League Gothic, headings only, Latin script), taxi yellow `--taxi #FFC72C` on primary buttons, a hard 3px ink offset shadow
+on buttons and the hero headline (yellow). Buttons press down 2px. Body text stays Hanken Grotesk.
+
 ## Shapes and surfaces
 Pill buttons and chips (radius 9999). Cards 24px radius, 1px `--line` border, no heavy shadows (one soft shadow allowed on floating sheets).
 Primary button: ink fill, paper text. Secondary: outline. Hover lifts 2px over 180ms.

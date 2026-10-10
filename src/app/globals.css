@@ -16,6 +16,7 @@
   --line-green: #00933c;
   --line-purple: #b933ad;
   --line-blue: #0039a6;
+  --taxi: #ffc72c; /* hand-painted-sign yellow: primary buttons and the headline offset */
   --line-orange: #ff6319;
   --line-lime: #6cbe45;
   --line-brown: #996633;
@@ -44,6 +45,7 @@
   --color-line-red: var(--line-red);
   --color-card: var(--card);
   --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-gothic), var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
   --text-display: clamp(40px, 7vw, 84px);
 }
 
@@ -55,15 +57,16 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
 @layer components {
-  .display { font-size: var(--text-display); font-weight: 500; letter-spacing: -0.03em; line-height: 1.02; }
-  .h2 { font-size: clamp(28px, 4vw, 44px); font-weight: 500; letter-spacing: -0.025em; line-height: 1.1; }
+  .display { font-family: var(--font-display); font-size: calc(var(--text-display) * 1.12); font-weight: 400; letter-spacing: 0; line-height: 0.95; text-shadow: 0.05em 0.05em 0 var(--taxi); }
+  .h2 { font-family: var(--font-display); font-size: clamp(34px, 4.8vw, 54px); font-weight: 400; letter-spacing: 0.005em; line-height: 1.02; }
   .eyebrow { font-size: 13px; letter-spacing: 0.02em; color: var(--muted); }
   .wrap { margin-inline: auto; max-width: 1180px; padding-inline: 20px; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 24px; }
   .pill { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; border-radius: 9999px; padding: 0 22px; font-size: 15px; font-weight: 500; transition: transform 180ms var(--ease), background-color 180ms var(--ease), opacity 180ms; }
   .pill:hover { transform: translateY(-2px); }
-  .pill-ink { background: var(--ink); color: var(--paper); }
-  .pill-ink:hover { opacity: 0.88; }
+  .pill-ink { background: var(--taxi); color: var(--ink); border: 2px solid var(--ink); font-weight: 600; box-shadow: 3px 3px 0 var(--ink); }
+  .pill-ink:hover { box-shadow: 5px 5px 0 var(--ink); }
+  .pill-ink:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
   .pill-line { border: 1px solid var(--ink); color: var(--ink); background: transparent; }
   .pill-line:hover { background: var(--ink); color: var(--paper); }
   /* a text link or button that is still 44px tall to touch */

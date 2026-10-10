@@ -1,7 +1,10 @@
 # spotholes
 
-Pothole Copilot for NYC: riders run a web app on an iPhone that spots potholes and warns by voice; every pass is saved so the
-next rider on the same path is warned and updates what we know. Non-riders use the map and stats pages to follow progress.
+Pothole photo record for NYC: NYC 311 pothole reports are the main thing. Riders run a web app on an iPhone that points
+(like Find My) to the nearest 311 spot, and the camera adds photos to it, so each report collects many pictures over time.
+Riders can also log hazards that nobody reported; those show on the map as circles, 311 reports as rounded squares.
+There is no ridden-streets trace and no "pothole ahead" voice warning; a "pothole near you" arrow is the only alert.
+Non-riders use the map, spot pages and stats to follow progress.
 Domain: spotholes.nyc. See @DESIGN.md for the design system (cream paper, ink, Hanken Grotesk, pill shapes).
 
 ## Status
