@@ -66,18 +66,24 @@ type Opts = {
   onResult: (e: RideEvent) => void;
   onHint: (hint: "screen") => void;
   onLuma: (luma: number) => void;
+  onStop: (place: string) => void; // nearing a stop on a suggested photo route
 };
+
+type RouteStop = { id: string; lat: number; lng: number; place: string };
+function routeStops(): RouteStop[] {
+  try { const raw = sessionStorage.getItem("spotholes-mission"); return raw ? (JSON.parse(raw) as RouteStop[]).filter((s) => Number.isFinite(s.lat) && Number.isFinite(s.lng)) : []; } catch { return []; }
+}
 
 // Runs a ride of any length and speed: tracks GPS, warns about saved hazards ahead, and sends camera frames to the
 // server, which detects new hazards and compares known ones with what earlier riders saw. Survives dropped signal.
-export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onHint, onLuma }: Opts) {
+export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onHint, onLuma, onStop }: Opts) {
   const [upcoming, setUpcoming] = useState<Upcoming | null>(null);
   const [distance, setDistance] = useState(0);
   const [gps, setGps] = useState<GpsState>("waiting");
   const [online, setOnline] = useState(true);
   const [meters_, setMeters] = useState(0); // distance covered this ride, from the GPS breadcrumbs
-  const live = useRef({ paused, onAhead, onResult, onHint, onLuma });
-  useEffect(() => { live.current = { paused, onAhead, onResult, onHint, onLuma }; }, [paused, onAhead, onResult, onHint, onLuma]);
+  const live = useRef({ paused, onAhead, onResult, onHint, onLuma, onStop });
+  useEffect(() => { live.current = { paused, onAhead, onResult, onHint, onLuma, onStop }; }, [paused, onAhead, onResult, onHint, onLuma, onStop]);
 
   useEffect(() => {
     if (!active) return;
@@ -93,6 +99,8 @@ export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onH
     let inFlight = 0;
     let crumbs: Crumb[] = [];
     let lastCrumb: { lat: number; lng: number } | null = null;
+    const stops = routeStops();
+    const announced = new Set<string>();
     const known = new Map<string, Known>();
     const warned = new Set<string>();
     const resolved = new Set<string>(); // hazards that already got a result on this ride
@@ -219,6 +227,8 @@ export function useRideEngine({ active, paused, videoRef, onAhead, onResult, onH
       }
 
       const warnM = warnDistance(pos.speed);
+      // a stop on the suggested photo route is coming up: say so once (the camera does the rest)
+      for (const s of stops) if (!announced.has(s.id) && meters(pos, s) <= warnM) { announced.add(s.id); live.current.onStop(s.place); }
       let best: { k: Known; d: number } | null = null;
       for (const k of known.values()) {
         if (warned.has(k.id)) continue;

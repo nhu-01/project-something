@@ -4,6 +4,7 @@ import { judgeFrame, type Verdict } from "./gemini";
 import { bbox, directionWord, meters, reverseGeocode, validPoint } from "./geo";
 import { savePhoto } from "./storage";
 import { damageConfidence, stripPadding } from "./yolo";
+import { linkCityReport } from "./city";
 
 // Phone GPS is only good to 5-20 m (worse between buildings), so anything this close to a known hazard is treated as
 // the same hazard. 15 m turned out to be too tight: a little drift made every visit log a "new" one.
@@ -127,6 +128,7 @@ export async function scanFrame(ride: Ride, frame: Buffer, pos: Position): Promi
   const photo = await photoFor(`${ride.id}-${row.id}.jpg`, frame, v);
   if (photo) await query("UPDATE potholes SET photo=$2 WHERE id=$1", [row.id, photo]);
   await record(ride, row.id, "first_seen", v, pos, photo, yolo, v.note);
+  await linkCityReport(row.id, pos.lat, pos.lng).catch(() => {}); // a matching 311 report now has its photo
   return { event: { kind: "new", potholeId: String(row.id), hazard: hazardOf(v), street: place.street, lane: v.lane, severity: sev } };
 }
 
@@ -180,5 +182,6 @@ export async function reportPhoto(ride: Ride, photo: Buffer, pos: Position): Pro
   const url = await photoFor(`${ride.id}-${row.id}.jpg`, photo, v);
   if (url) await query("UPDATE potholes SET photo=$2 WHERE id=$1", [row.id, url]);
   await record(ride, row.id, "first_seen", v, pos, url, null, v.note);
+  await linkCityReport(row.id, pos.lat, pos.lng).catch(() => {});
   return { ok: true, event: { kind: "new", potholeId: String(row.id), hazard: hazardOf(v), street: place.street, lane: v.lane, severity: sev }, photoKept: Boolean(url) };
 }

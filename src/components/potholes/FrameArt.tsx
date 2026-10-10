@@ -1,9 +1,12 @@
+"use client";
 import type { Pothole } from "@/lib/data/types";
+import { useI18n } from "@/lib/i18n/client";
 
 // Shows the rider's camera frame; falls back to a drawn placeholder when no photo was kept.
 export default function FrameArt({ pothole, className }: { pothole: Pick<Pothole, "seed" | "severity" | "photo">; className?: string }) {
+  const { t } = useI18n();
   if (pothole.photo) {
-    return <img src={pothole.photo} alt="frame from a rider's camera" className={className} />;
+    return <img src={pothole.photo} alt={t("reel.fromCamera")} className={className} />;
   }
   const r = (n: number) => ((pothole.seed * 9301 + n * 49297) % 233280) / 233280;
   const sev = pothole.severity ?? 1;
@@ -11,7 +14,7 @@ export default function FrameArt({ pothole, className }: { pothole: Pick<Pothole
   const cx = 130 + r(3) * 140, cy = 118 + r(4) * 40;
   const specks = Array.from({ length: 36 }, (_, i) => ({ x: r(i + 10) * 400, y: r(i + 60) * 240, s: 0.8 + r(i + 90) * 1.8 }));
   return (
-    <svg viewBox="0 0 400 240" className={className} role="img" aria-label="illustration of a pothole (no photo was kept for this one)" preserveAspectRatio="xMidYMid slice">
+    <svg viewBox="0 0 400 240" className={className} role="img" aria-label={t("common.noPhoto")} preserveAspectRatio="xMidYMid slice">
       <rect width="400" height="240" fill="#cfcec6" />
       <rect y="150" width="400" height="90" fill="#c4c3bb" />
       <path d="M0 150 Q200 138 400 150" stroke="#b6b5ad" strokeWidth="1.5" fill="none" />

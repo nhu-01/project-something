@@ -17,4 +17,6 @@ for k in ELEVENLABS_API_KEY ELEVENLABS_VOICE_FEMALE ELEVENLABS_VOICE_MALE ADMIN_
 done
 # Only create the salt once: changing it would rename every rider and invalidate active rides.
 $VERCEL env ls production 2>/dev/null | grep -q HASH_SALT || put HASH_SALT "$(openssl rand -hex 16)"
+# Vercel Cron sends this as a bearer token to the daily 311 sync.
+$VERCEL env ls production 2>/dev/null | grep -q CRON_SECRET || put CRON_SECRET "$(openssl rand -hex 24)"
 echo "done"

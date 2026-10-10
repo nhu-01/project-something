@@ -32,6 +32,11 @@ export type Pothole = {
   photo?: string; // rider camera frame
 };
 
+// A pothole complaint from NYC 311 open data that no rider has photographed yet.
+export type CityReport = { id: string; lat: number; lng: number; place: string; borough: string; createdAt: string; status: string };
+// A suggested route past a few of those reports.
+export type Mission = { stops: CityReport[]; line: [number, number][]; distanceM: number; routed: boolean };
+
 // A stretch of street someone rode with the app on, as [lat, lng] pairs.
 export type Track = [number, number][];
 

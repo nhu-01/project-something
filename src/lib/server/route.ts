@@ -7,9 +7,9 @@ export type RouteHazard = { id: string; kind: string; street: string; lane: stri
 
 // A cycling route from a public OpenStreetMap routing server. If it's unavailable we fall back to a straight line,
 // which is only a rough guide (and is labelled as such in the UI).
-async function bikeRoute(from: LatLng, to: LatLng): Promise<LatLng[] | null> {
+export async function bikeRoute(points: LatLng[]): Promise<LatLng[] | null> {
   try {
-    const url = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`;
+    const url = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${points.map((p) => `${p[1]},${p[0]}`).join(";")}?overview=full&geometries=geojson`;
     const res = await fetch(url, { signal: AbortSignal.timeout(6000), headers: { "user-agent": "spotholes.nyc (hackathon project)" } });
     if (!res.ok) return null;
     const coords = (await res.json())?.routes?.[0]?.geometry?.coordinates as [number, number][] | undefined;
@@ -29,7 +29,7 @@ function toSegment(p: LatLng, a: LatLng, b: LatLng) {
 }
 
 export async function hazardsOnTheWay(from: LatLng, to: LatLng) {
-  const routed = await bikeRoute(from, to);
+  const routed = await bikeRoute([from, to]);
   // very long routes come back with thousands of points; thin them so matching stays fast
   const full = routed ?? [from, to];
   const step = Math.max(1, Math.ceil(full.length / 1500));
@@ -58,4 +58,27 @@ export async function hazardsOnTheWay(from: LatLng, to: LatLng) {
   }
   hazards.sort((a, b) => a.alongM - b.alongM);
   return { hazards, distanceM: Math.round(cum[cum.length - 1]), routed: Boolean(routed) };
+}
+
+const STOPS = 5;
+
+// A short loop of nearby 311 reports nobody has photographed yet: nearest first, then nearest to that one, and so on.
+export async function photoMission(from: LatLng) {
+  const { cityReportsNear } = await import("./city");
+  const pool = (await cityReportsNear(from[0], from[1], 5000)).slice(0, 60);
+  const stops: typeof pool = [];
+  let here = from;
+  while (stops.length < STOPS && pool.length) {
+    pool.sort((a, b) => meters(here[0], here[1], a.lat, a.lng) - meters(here[0], here[1], b.lat, b.lng));
+    const next = pool.shift()!;
+    // two reports for the same corner would be one photo stop
+    if (stops.some((s) => meters(s.lat, s.lng, next.lat, next.lng) < 60)) continue;
+    stops.push(next); here = [next.lat, next.lng];
+  }
+  if (!stops.length) return { stops: [], line: [] as LatLng[], distanceM: 0, routed: false };
+  const points: LatLng[] = [from, ...stops.map((s) => [s.lat, s.lng] as LatLng)];
+  const routed = await bikeRoute(points);
+  const line = routed ?? points;
+  const distanceM = Math.round(line.slice(1).reduce((d, p, i) => d + meters(line[i][0], line[i][1], p[0], p[1]), 0));
+  return { stops: stops.map(({ meters: _m, ...s }) => { void _m; return s; }), line, distanceM, routed: Boolean(routed) };
 }

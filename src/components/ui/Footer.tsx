@@ -1,4 +1,9 @@
-export default function Footer() {
+import Link from "next/link";
+import { getT } from "@/lib/i18n/server";
+import LanguageButton from "./LanguageButton";
+
+export default async function Footer() {
+  const { t } = await getT();
   return (
     <footer className="mt-24 border-t border-line">
       {/* a quiet nod to the subway map */}
@@ -6,8 +11,10 @@ export default function Footer() {
         {["red", "green", "purple", "blue", "orange", "lime", "brown", "gray", "yellow", "slate", "teal"].map((c) => <span key={c} className="h-2 w-2 rounded-full" style={{ background: `var(--line-${c})` }} />)}
       </div>
       <div className="wrap flex flex-col gap-3 pb-8 pt-4 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
-        <span>spotholes.nyc · an independent project, not affiliated with the city of new york</span>
-        <span><a href="/report" className="underline underline-offset-4">report a spot by photo</a> · severity and size are ai estimates · never handle your phone while moving</span>
+        <span>{t("footer.independent")}</span>
+        <span>
+          <Link href="/report" className="underline underline-offset-4">{t("footer.reportLink")}</Link> · {t("footer.notes")} · <LanguageButton className="underline underline-offset-4" />
+        </span>
       </div>
     </footer>
   );

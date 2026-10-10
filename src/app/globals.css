@@ -112,4 +112,7 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
 .pin:hover .pin-dot { transform: scale(1.18); }
 .pin--selected .pin-dot { box-shadow: 0 0 0 2px var(--ink), 0 6px 14px rgb(32 33 30 / 0.3); transform: scale(1.2); }
 .pin--repaired .pin-dot { background: var(--paper); color: var(--repaired); border-color: var(--repaired); }
+.pin--city .pin-dot { background: var(--paper); color: var(--ink); border: 2px dashed var(--ink); box-shadow: none; font-size: 10px; }
+.cluster--city { background: var(--paper) !important; color: var(--ink) !important; border: 2px dashed var(--ink); box-shadow: none !important; }
+.stop { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 9999px; background: var(--ink); color: var(--paper); font-size: 14px; font-weight: 700; border: 2px solid var(--paper); box-shadow: 0 4px 10px rgb(32 33 30 / 0.3); }
 .cluster { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 9999px; background: var(--ink); color: var(--paper); font-size: 14px; font-weight: 500; box-shadow: 0 0 0 5px color-mix(in srgb, var(--ink) 14%, transparent); }

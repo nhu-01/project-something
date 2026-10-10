@@ -10,53 +10,54 @@ import Steps from "@/components/landing/Steps";
 import { ArrowUpRight } from "@/components/ui/Icons";
 import Reveal from "@/components/ui/Reveal";
 import { getPotholes, getStats } from "@/lib/data";
+import { getT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
-const SWAP = [
-  { text: "potholes", color: "var(--line-red)" },
-  { text: "bumps", color: "var(--line-orange)" },
-  { text: "rough pavement", color: "var(--line-yellow)" },
-  { text: "missing pavers", color: "var(--line-blue)" },
-  { text: "sunken covers", color: "var(--line-purple)" },
-];
-
 export default async function Home() {
-  const [potholes, stats] = await Promise.all([getPotholes(), getStats()]);
+  const [potholes, stats, { t, lang }] = await Promise.all([getPotholes(), getStats(), getT()]);
   // the most-ridden hazards that have camera frames, for the photo reel
   const hasPhoto = (p: (typeof potholes)[number]) => Boolean(p.photo) || p.sightings.some((x) => x.photo);
   const stories = potholes.filter(hasPhoto).sort((a, b) => b.sightings.length - a.sightings.length).slice(0, 5);
+  const swap = [
+    { text: t("home.swap.potholes"), color: "var(--line-red)" },
+    { text: t("home.swap.bumps"), color: "var(--line-orange)" },
+    { text: t("home.swap.rough"), color: "var(--line-yellow)" },
+    { text: t("home.swap.pavers"), color: "var(--line-blue)" },
+    { text: t("home.swap.covers"), color: "var(--line-purple)" },
+  ];
   return (
     <>
       <section className="wrap pt-14 sm:pt-20">
         <div className="mx-auto max-w-3xl text-center">
-          <Reveal><p className="eyebrow">a pothole copilot for new york</p></Reveal>
-          <h1 className="display mt-4" aria-label="ride. the city remembers."><SplitReveal lines={["ride. the city", "remembers."]} delay={0.1} /></h1>
+          <Reveal><p className="eyebrow">{t("home.eyebrow")}</p></Reveal>
+          <h1 className="display mt-4" aria-label={`${t("home.title1")} ${t("home.title2")}`}><SplitReveal lines={[t("home.title1"), t("home.title2")]} delay={0.1} /></h1>
           <Reveal delay={0.55}>
             <p className="mx-auto mt-6 max-w-xl text-lg text-muted">
-              spotholes watches for <WordSwap words={SWAP} /> as you ride or walk, warns the next person, and keeps a living map of nyc&apos;s streets.
+              {t("home.introBefore")} <WordSwap words={swap} /> {t("home.introAfter")}
             </p>
           </Reveal>
           <Reveal delay={0.7}>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-              <Link href="/ride" className="pill pill-ink">start a ride <ArrowUpRight /></Link>
-              <Link href="/map" className="pill pill-line">see the map <ArrowUpRight /></Link>
+              <Link href="/ride" className="pill pill-ink">{t("nav.start")} <ArrowUpRight /></Link>
+              <Link href="/map" className="pill pill-line">{t("home.seeMap")} <ArrowUpRight /></Link>
             </div>
-            <p className="mt-4 text-sm text-muted">not riding? <Link href="/report" className="underline underline-offset-4">report a spot by photo</Link></p>
+            <p className="mt-4 text-sm text-muted">{t("home.notRiding")} <Link href="/report" className="underline underline-offset-4">{t("footer.reportLink")}</Link></p>
           </Reveal>
         </div>
-        <div className="mx-auto mt-10 max-w-[1100px] sm:mt-14"><HeroScene /></div>
+        {/* the route sketch always reads left to right */}
+        <div className="mx-auto mt-10 max-w-[1100px] sm:mt-14" dir="ltr"><HeroScene /></div>
       </section>
-      <Ticker potholes={potholes} />
-      <Steps />
-      {stories.length > 0 && <OnePothole potholes={stories} />}
-      <StatsStrip stats={stats} />
+      <Ticker potholes={potholes} t={t} lang={lang} />
+      <Steps t={t} />
+      {stories.length > 0 && <OnePothole potholes={stories} t={t} />}
+      <StatsStrip stats={stats} t={t} />
       <section className="wrap mt-28 text-center">
         <Reveal>
-          <ScrollFillText text="your next ride makes the next one safer." className="h2 mx-auto max-w-[20ch]" />
+          <ScrollFillText text={t("home.closing")} className="h2 mx-auto max-w-[20ch]" />
           <div className="mt-8 flex justify-center gap-3">
-            <Link href="/ride" className="pill pill-ink">start a ride <ArrowUpRight /></Link>
-            <Link href="/stats" className="pill pill-line">see progress</Link>
+            <Link href="/ride" className="pill pill-ink">{t("nav.start")} <ArrowUpRight /></Link>
+            <Link href="/stats" className="pill pill-line">{t("home.seeProgress")}</Link>
           </div>
         </Reveal>
       </section>
