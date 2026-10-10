@@ -1,5 +1,6 @@
 "use client";
 import { useReducedMotion } from "motion/react";
+import { useMedia } from "@/lib/useMedia";
 import { useI18n } from "@/lib/i18n/client";
 import type { Key } from "@/lib/i18n";
 import { pointAt, ROUTE_D } from "./routeMath";
@@ -21,10 +22,16 @@ const seq = (a: number[]) => a.map((n) => n.toFixed(4)).join(";");
 export default function HeroScene() {
   const reduce = useReducedMotion();
   const { t } = useI18n();
+  // On a phone the whole sketch is only ~350px wide, which shrinks its words to nothing. Crop in to the middle of the
+  // street and draw the type larger so it stays readable (about 11px on screen).
+  const compact = useMedia("(max-width: 640px)");
+  const view = compact ? "170 10 860 370" : "0 0 1200 380";
+  const fs = compact ? 30 : 13, chipH = compact ? 48 : 30, capFs = compact ? 29 : 16, capY = compact ? 358 : 362, capX = compact ? 600 : 600;
+  const fitCaption = (text: string) => { const w = [...text].length * capFs * 0.52; return w > 820 ? { textLength: 820, lengthAdjust: "spacingAndGlyphs" as const } : {}; };
   const dur = `${CYCLE}s`;
 
   return (
-    <svg viewBox="0 0 1200 380" className="h-auto w-full" role="img" aria-label={t("home.heroAlt")} preserveAspectRatio="xMidYMid meet">
+    <svg viewBox={view} className="h-auto w-full" role="img" aria-label={t("home.heroAlt")} preserveAspectRatio="xMidYMid meet">
       <defs>
         <linearGradient id="fade" x1="0" x2="1">
           <stop offset="0" stopColor="var(--paper)" stopOpacity="1" />
@@ -51,7 +58,7 @@ export default function HeroScene() {
         const s2 = R2_START + (R2_END - R2_START) * h.f; // rider 2 reaches it
         const warnAt = Math.max(R2_START + 0.005, s2 - 0.055);
         const label = `${t("home.aheadLabel")} · ${t(`sev.${h.sev}` as Key)}`;
-        const labelW = [...label].length * 8.4 + 28;
+        const labelW = [...label].length * fs * 0.62 + 30;
         return (
           <g key={i}>
             {/* remembered pothole */}
@@ -71,10 +78,10 @@ export default function HeroScene() {
                   <animate attributeName="opacity" dur={dur} repeatCount="indefinite" values="0;0.7;0;0" keyTimes={seq([0, s2, s2 + 0.07, 1])} />
                 </circle>
                 {/* warning for rider 2 */}
-                <g opacity="0" transform={`translate(${p.x - labelW / 2} ${p.y - 52})`}>
+                <g opacity="0" transform={`translate(${p.x - labelW / 2} ${p.y - (compact ? 74 : 52)})`}>
                   <animate attributeName="opacity" dur={dur} repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes={seq([0, warnAt, warnAt + 0.02, s2 + 0.03, s2 + 0.055, 1])} />
-                  <rect width={labelW} height="30" rx="15" fill="var(--ink)" />
-                  <text x={labelW / 2} y="19.5" textAnchor="middle" fontSize="13" fill="var(--paper)" fontFamily="var(--font-hanken), sans-serif">{label}</text>
+                  <rect width={labelW} height={chipH} rx={chipH / 2} fill="var(--ink)" />
+                  <text x={labelW / 2} y={chipH / 2 + fs * 0.34} textAnchor="middle" fontSize={fs} fill="var(--paper)" fontFamily="var(--font-hanken), sans-serif">{label}</text>
                 </g>
               </>
             )}
@@ -87,13 +94,13 @@ export default function HeroScene() {
           {/* rider 1 */}
           <g opacity="0">
             <animate attributeName="opacity" dur={dur} repeatCount="indefinite" values="0;1;1;0;0" keyTimes={seq([0, 0.015, R1_END, R1_END + 0.02, 1])} />
-            <circle r="13" fill="var(--line-red)" /><text y="5" textAnchor="middle" fontSize="15" fontWeight="700" fill="#fff" fontFamily="var(--font-hanken), sans-serif">1</text>
+            <circle r={compact ? 20 : 13} fill="var(--line-red)" /><text y={compact ? 9 : 5} textAnchor="middle" fontSize={compact ? 29 : 15} fontWeight="700" fill="#fff" fontFamily="var(--font-hanken), sans-serif">1</text>
             <animateMotion dur={dur} repeatCount="indefinite" keyPoints="0;1;1" keyTimes={seq([0, R1_END, 1])} calcMode="linear"><mpath href="#route" /></animateMotion>
           </g>
           {/* rider 2 */}
           <g opacity="0">
             <animate attributeName="opacity" dur={dur} repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes={seq([0, R2_START, R2_START + 0.015, R2_END, R2_END + 0.02, 1])} />
-            <circle r="13" fill="var(--line-red)" /><text y="5" textAnchor="middle" fontSize="15" fontWeight="700" fill="#fff" fontFamily="var(--font-hanken), sans-serif">2</text>
+            <circle r={compact ? 20 : 13} fill="var(--line-red)" /><text y={compact ? 9 : 5} textAnchor="middle" fontSize={compact ? 29 : 15} fontWeight="700" fill="#fff" fontFamily="var(--font-hanken), sans-serif">2</text>
             <animateMotion dur={dur} repeatCount="indefinite" keyPoints="0;0;1;1" keyTimes={seq([0, R2_START, R2_END, 1])} calcMode="linear"><mpath href="#route" /></animateMotion>
           </g>
           {/* captions */}
@@ -102,16 +109,16 @@ export default function HeroScene() {
             { t: t("home.caption2"), a: R2_START, b: R2_END },
             { t: t("home.caption3"), a: 0.92, b: 0.995 },
           ].map((c) => (
-            <text key={c.t} x="600" y="362" textAnchor="middle" fontSize="16" fill="var(--muted)" opacity="0" fontFamily="var(--font-hanken), sans-serif">
+            <text key={c.t} x={capX} y={capY} textAnchor="middle" fontSize={capFs} {...fitCaption(c.t)} fill="var(--muted)" opacity="0" fontFamily="var(--font-hanken), sans-serif">
               <animate attributeName="opacity" dur={dur} repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes={seq([0, c.a, c.a + 0.02, c.b - 0.02, c.b, 1])} />
               {c.t}
             </text>
           ))}
         </>
       )}
-      {reduce && <text x="600" y="362" textAnchor="middle" fontSize="16" fill="var(--muted)" fontFamily="var(--font-hanken), sans-serif">{t("home.captionStill")}</text>}
+      {reduce && <text x={capX} y={capY} textAnchor="middle" fontSize={capFs} {...fitCaption(t("home.captionStill"))} fill="var(--muted)" fontFamily="var(--font-hanken), sans-serif">{t("home.captionStill")}</text>}
 
-      <rect width="1200" height="380" fill="url(#fade)" pointerEvents="none" />
+      <rect x={compact ? 170 : 0} y="0" width={compact ? 860 : 1200} height="380" fill="url(#fade)" pointerEvents="none" />
     </svg>
   );
 }

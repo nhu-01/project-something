@@ -132,9 +132,10 @@ export default function RideScreen() {
       {/* one camera for both setup and the ride, so it never restarts in between */}
       <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" playsInline muted autoPlay aria-hidden />
       {cameraState !== "on" && (
-        <div className="absolute inset-0 grid place-items-center bg-ink p-8 text-center text-sm text-paper/60">
+        // out of the way at the top, so it never lands behind the setup card
+        <p role="status" className="absolute inset-x-6 text-center text-sm text-paper/70" style={{ top: "calc(env(safe-area-inset-top) + 84px)" }}>
           {cameraState === "denied" ? t("hud.cameraDenied") : t("hud.cameraStarting")}
-        </div>
+        </p>
       )}
       <div className={`absolute inset-0 transition-colors duration-500 ${riding ? "bg-ink/25" : "bg-ink/45"}`} aria-hidden />
 

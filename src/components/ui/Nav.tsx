@@ -7,7 +7,7 @@ export default async function Nav() {
   return (
     <header className="sticky top-0 z-[1500] border-b border-transparent bg-paper/80 backdrop-blur-md">
       <nav className="wrap flex h-16 items-center justify-between gap-2" aria-label="Main">
-        <Link href="/" className="flex items-center gap-2 text-[17px] font-medium tracking-tight">
+        <Link href="/" className="tap flex items-center gap-2 text-[17px] font-medium tracking-tight">
           <span className="grid h-6 w-6 place-items-center rounded-full border border-ink" aria-hidden>
             <span className="logo-dot h-2.5 w-2.5 rounded-full" />
           </span>

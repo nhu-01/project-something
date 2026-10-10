@@ -66,6 +66,8 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
   .pill-ink:hover { opacity: 0.88; }
   .pill-line { border: 1px solid var(--ink); color: var(--ink); background: transparent; }
   .pill-line:hover { background: var(--ink); color: var(--paper); }
+  /* a text link or button that is still 44px tall to touch */
+  .tap { display: inline-flex; min-height: 44px; align-items: center; }
   .chip { display: inline-flex; min-height: 36px; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 9999px; padding: 0 14px; font-size: 14px; background: var(--card); transition: background-color 160ms, border-color 160ms; }
   .chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
   /* A subway-style bullet: a small colored circle with a number or letter. */
@@ -84,6 +86,8 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
   81%, 88% { background: var(--line-slate); } 90%, 97% { background: var(--line-gray); } 100% { background: var(--line-red); }
 }
 @media (prefers-reduced-motion: reduce) { .logo-dot { animation: none; } }
+
+@media (pointer: coarse) { .chip { min-height: 44px; } }
 
 /* ---------- Motion ---------- */
 .ticker { overflow: hidden; mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent); }

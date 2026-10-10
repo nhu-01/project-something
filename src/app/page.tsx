@@ -42,7 +42,7 @@ export default async function Home() {
               <Link href="/ride" className="pill pill-ink">{t("nav.start")} <ArrowUpRight /></Link>
               <Link href="/map" className="pill pill-line">{t("home.seeMap")} <ArrowUpRight /></Link>
             </div>
-            <p className="mt-4 text-sm text-muted">{t("home.notRiding")} <Link href="/report" className="underline underline-offset-4">{t("footer.reportLink")}</Link></p>
+            <p className="mt-4 text-sm text-muted">{t("home.notRiding")} <Link href="/report" className="tap underline underline-offset-4">{t("footer.reportLink")}</Link></p>
           </Reveal>
         </div>
         {/* the route sketch always reads left to right */}

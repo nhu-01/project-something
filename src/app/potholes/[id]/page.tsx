@@ -26,7 +26,7 @@ export default async function PotholePage({ params }: { params: Promise<{ id: st
   ];
   return (
     <div className="wrap pt-8 sm:pt-12">
-      <Link href="/map" className="text-sm text-muted transition-colors hover:text-ink">{t("pothole.back")}</Link>
+      <Link href="/map" className="tap text-sm text-muted transition-colors hover:text-ink">{t("pothole.back")}</Link>
       <div className="mt-6 grid gap-8 md:grid-cols-[1.1fr_1fr]">
         <Reveal><div className="card overflow-hidden"><FrameArt pothole={p} className="max-h-[70vh] w-full object-cover" /></div></Reveal>
         <Reveal delay={0.08} className="space-y-5">
@@ -36,7 +36,7 @@ export default async function PotholePage({ params }: { params: Promise<{ id: st
           <dl className="card divide-y divide-line text-[15px]">
             {facts.map(([k, v]) => (<div key={k} className="flex justify-between gap-4 px-5 py-3"><dt className="text-muted">{k}</dt><dd className="text-end font-medium">{v}</dd></div>))}
           </dl>
-          <p className="text-sm text-muted">{t("pothole.disclaimer")} <a className="underline underline-offset-4" href="https://portal.311.nyc.gov/">{t("pothole.report311")}</a>.</p>
+          <p className="text-sm text-muted">{t("pothole.disclaimer")} <a className="tap underline underline-offset-4" href="https://portal.311.nyc.gov/">{t("pothole.report311")}</a>.</p>
         </Reveal>
       </div>
       <section className="mt-16" aria-labelledby="history">
