@@ -9,6 +9,12 @@ import type { Phase, RideEvent, Upcoming } from "./types";
 import { aheadPhrase, briefPhrase, cuePhrase, preferredLang, resultPhrase, screenPhrase, type Lang } from "@/lib/voice";
 
 const noSubscribe = () => () => {};
+
+// 7pm up to (not including) 5am in New York, whatever the phone's own time zone is. Follows daylight saving.
+export function isNightInNewYork(now = new Date()) {
+  const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", hourCycle: "h23" }).format(now));
+  return hour >= 19 || hour < 5;
+}
 type Voice = "f" | "m";
 const savedVoice = (): Voice => { try { return localStorage.getItem("spotholes-voice") === "m" ? "m" : "f"; } catch { return "f"; } };
 const save = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* storage blocked */ } };
@@ -67,6 +73,19 @@ export default function RideScreen() {
     }
   }, [torchSupported, torchOn, setTorch]);
   const toggleTorch = () => { dark.current.manual = true; void setTorch(!torchOn); };
+
+  // Night hours: from 7pm to 5am New York time the flashlight comes on by itself during a ride, including when a
+  // ride runs past 7pm. The rider can still switch it off, and it then stays off for the rest of that ride.
+  useEffect(() => {
+    if (!riding || cameraState !== "on" || !torchSupported) return;
+    const check = () => {
+      if (dark.current.manual || torchOn || !isNightInNewYork()) return;
+      void setTorch(true).then((ok) => { if (ok) setNotice("it's after 7pm, so the flashlight is on. tap the flashlight to turn it off."); });
+    };
+    check();
+    const t = setInterval(check, 30000);
+    return () => clearInterval(t);
+  }, [riding, cameraState, torchSupported, torchOn, setTorch]);
   const { upcoming, distance, gps, online, meters } = useRideEngine({ active: riding, paused, videoRef, onAhead, onResult, onHint, onLuma });
 
   // Say so the first time GPS locks on, so the rider knows it's working without looking.
