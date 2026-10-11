@@ -82,23 +82,46 @@ export default function RideHud({ demo = false, gps, online, last, events, child
       {demo && <p className="absolute inset-x-0 flex justify-center" style={{ top: "calc(env(safe-area-inset-top) + 60px)" }}><span className="rounded-full bg-taxi px-3 py-1 text-xs font-medium text-ink">{t("demo.banner")}</span></p>}
       {children}
 
-      {/* warning + result */}
+      {/* a photo was added: the same look as the walkthrough (glass note on top, grade strip and card at the bottom) */}
+      <AnimatePresence>
+        {last && (
+          <motion.p key={`top-${last.id}`} {...rise} role="status" className="absolute inset-x-4 z-10 mx-auto max-w-md rounded-full border border-paper/25 bg-ink/45 px-4 py-2.5 text-center text-[14px] text-paper backdrop-blur-md" style={{ top: "calc(env(safe-area-inset-top) + 76px)" }}>
+            {t(`hud.result.${last.kind}` as Key)}
+          </motion.p>
+        )}
+      </AnimatePresence>
       <div className="pointer-events-none absolute inset-x-0 flex flex-col items-center gap-3 px-4" style={{ bottom: "calc(env(safe-area-inset-bottom) + 232px)" }}>
         <AnimatePresence mode="wait">
-          {notice ? (
+          {notice && !last ? (
             <motion.div key={notice} {...rise} role="status" className="max-w-md rounded-full bg-paper/95 px-5 py-3 text-center text-[15px] text-ink backdrop-blur">{notice}</motion.div>
-          ) : last ? (
-            <motion.div key={last.id} {...rise} role="status" className="rounded-[28px] bg-paper/95 px-5 py-3 text-[15px] text-ink backdrop-blur">
-              {last.severity ? (
-                <span className="flex items-center gap-3">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-base font-bold" style={{ background: SEV_VAR[last.severity], color: SEV_DARK_TEXT[last.severity] ? "var(--ink)" : "#fff" }} aria-hidden>{GRADE[last.severity]}</span>
-                  <span className="text-start"><span className="block">{t(`hud.result.${last.kind}` as Key)}</span><span className="block text-xs text-muted">{t("common.severityN", { n: GRADE[last.severity], word: t(`sev.${last.severity}` as Key) })}</span></span>
-                </span>
-              ) : (<><span className="mr-2 inline-block h-2 w-2 rounded-full bg-moss align-middle" aria-hidden />{t(`hud.result.${last.kind}` as Key)}</>)}
-            </motion.div>
           ) : null}
         </AnimatePresence>
       </div>
+      <AnimatePresence>
+        {last && (
+          <motion.div key={`card-${last.id}`} {...rise} className="pointer-events-none absolute inset-x-0 z-10 flex flex-col items-center gap-2 px-3" style={{ bottom: "calc(env(safe-area-inset-bottom) + 104px)" }}>
+            {last.severity && (
+              <div className="flex justify-center gap-1.5" aria-hidden>
+                {([1, 2, 3, 4, 5] as const).map((g) => (
+                  <span key={g} className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${g === last.severity ? "scale-110 shadow-[0_0_0_2px_var(--paper)]" : "opacity-60"}`}
+                    style={{ background: SEV_VAR[g], color: SEV_DARK_TEXT[g] ? "var(--ink)" : "#fff" }}>{GRADE[g]}</span>
+                ))}
+              </div>
+            )}
+            <div role="status" className="flex w-full max-w-md items-center gap-3 rounded-[22px] bg-paper p-3 text-ink shadow-[0_12px_36px_rgb(0_0_0/0.4)]">
+              {last.severity ? (
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full text-2xl font-bold" style={{ background: SEV_VAR[last.severity], color: SEV_DARK_TEXT[last.severity] ? "var(--ink)" : "#fff" }} aria-hidden>{GRADE[last.severity]}</span>
+              ) : (
+                <span className="h-3 w-3 shrink-0 rounded-full bg-moss" aria-hidden />
+              )}
+              <div className="min-w-0">
+                <p className="text-[15px] font-medium">{last.severity ? t("common.severityN", { n: GRADE[last.severity], word: t(`sev.${last.severity}` as Key) }) : t(`hud.result.${last.kind}` as Key)}</p>
+                <p className="truncate text-xs text-muted">{t(`hazard.${last.hazard}` as Key)} · {last.street}</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* controls */}
       <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-3 p-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>

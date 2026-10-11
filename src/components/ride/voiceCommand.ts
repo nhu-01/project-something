@@ -3,15 +3,17 @@ import { useEffect, useRef, useState } from "react";
 
 const CLIP_MS = 3500;
 const LOUD = 0.05; // clips quieter than this are never uploaded
-const COMMAND = /\b(take|snap|capture|grab|shoot)\b.*\b(pic|picture|photo|image|shot)\b|\b(pic|picture|photo)\b.*\b(here|now)\b/i;
+const SNAP = /\b(take|snap|capture|grab|shoot)\b.*\b(pic|picture|photo|image|shot)\b|\b(pic|picture|photo)\b.*\b(here|now)\b/i;
+const END = /\b(end|stop|finish)\b.{0,15}\b(video|recording|visit|camera)\b|\b(i'?m|we'?re|that'?s|all)\s+(done|finished|set)\b/i;
 
-export const heardCommand = (text: string) => COMMAND.test(text);
+export type VoiceIntent = "snap" | "end";
+export const heardCommand = (text: string): VoiceIntent | null => (END.test(text) ? "end" : SNAP.test(text) ? "snap" : null);
 
 type Ride = { rideId: string; token: string } | null;
 
 // Listens for "take a picture here". Only while switched on: the microphone records short clips, loud-enough ones go
 // to ElevenLabs speech-to-text through /api/listen, and only the matching text comes back. Clips are not stored.
-export function useVoiceCommand({ on, getRide, onCommand, onUnavailable, isSpeaking }: { on: boolean; getRide: () => Ride; onCommand: () => void; onUnavailable: () => void; isSpeaking: () => boolean }) {
+export function useVoiceCommand({ on, getRide, onCommand, onUnavailable, isSpeaking }: { on: boolean; getRide: () => Ride; onCommand: (intent: VoiceIntent) => void; onUnavailable: () => void; isSpeaking: () => boolean }) {
   const [listening, setListening] = useState(false);
   const cb = useRef({ getRide, onCommand, onUnavailable, isSpeaking });
   useEffect(() => { cb.current = { getRide, onCommand, onUnavailable, isSpeaking }; }, [getRide, onCommand, onUnavailable, isSpeaking]);
@@ -63,7 +65,8 @@ export function useVoiceCommand({ on, getRide, onCommand, onUnavailable, isSpeak
             if (res.status === 503) { cb.current.onUnavailable(); return; }
             if (!res.ok) return;
             const { text } = (await res.json()) as { text?: string };
-            if (text && heardCommand(text)) cb.current.onCommand();
+            const intent = text ? heardCommand(text) : null;
+            if (intent) cb.current.onCommand(intent);
           } catch { /* offline: try the next clip */ }
         };
         rec.start();

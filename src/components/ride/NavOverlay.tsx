@@ -20,11 +20,12 @@ const TURN: Record<TurnKind, number> = { straight: 0, bearLeft: -35, left: -90, 
 type Props = {
   pos: Pos | null; compass: number | null; target: NavTarget | null; alert: NearAlert | null; nav: NavState;
   spots: Spot[]; hazards: NearbyHazard[]; finished: boolean; free: boolean;
+  quiet: boolean; // a result card is on screen: the direction card and mini-map step aside
 };
 
 // The see-through navigation layer on top of the camera: an arrow to the next 311 spot (like Find My), how far it
 // is, a small live map, and a second arrow when another pothole is close. Glass panels keep the road visible.
-export default function NavOverlay({ pos, compass, target, alert, nav, spots, hazards, finished, free }: Props) {
+export default function NavOverlay({ pos, compass, target, alert, nav, spots, hazards, finished, free, quiet }: Props) {
   const { t } = useI18n();
   const reduce = useReducedMotion();
   const [big, setBig] = useState(false);
@@ -33,7 +34,7 @@ export default function NavOverlay({ pos, compass, target, alert, nav, spots, ha
   const glass = "bg-ink/35 text-paper backdrop-blur-md border border-paper/25";
 
   return (
-    <>
+    <div className={`transition-opacity duration-300 ${quiet ? "pointer-events-none opacity-0" : "opacity-100"}`}>
       {/* arrow + distance, top centre under the status bar */}
       <div className="pointer-events-none absolute inset-x-0 flex flex-col items-center gap-2 px-4" style={{ top: "calc(env(safe-area-inset-top) + 76px)" }}>
         {target ? (
@@ -85,6 +86,6 @@ export default function NavOverlay({ pos, compass, target, alert, nav, spots, ha
         <RideMap pos={pos} target={target} spots={spots} hazards={hazards} route={nav.coords} label={t("hud.map")} />
         <button type="button" onClick={() => setBig((b) => !b)} aria-label={big ? t("hud.mapSmall") : t("hud.mapBig")} className="absolute end-1 top-1 h-11 w-11 rounded-full bg-paper/80 text-ink">{big ? "–" : "+"}</button>
       </div>
-    </>
+    </div>
   );
 }

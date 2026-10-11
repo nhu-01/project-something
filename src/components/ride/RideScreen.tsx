@@ -41,6 +41,7 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
   const [auto, setAuto] = useState(false); // off: photos are taken when asked for; on: the camera also picks potholes out itself
   const [flash, setFlash] = useState(0);
   const startedAt = useRef(0);
+  const activity = useRef(0); // last photo, snap or command; the visit ends by itself when it goes quiet
   const [summary, setSummary] = useState({ seconds: 0 });
   const speech = useSpeech(voice);
   const riding = phase === "riding";
@@ -49,6 +50,7 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
   useWakeLock(riding);
 
   const onResult = useCallback((e: RideEvent) => {
+    activity.current = Date.now();
     setEvents((cur) => [...cur, e]);
     setLast(e);
     setNotice(null);
@@ -94,7 +96,7 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
   const onAtSpot = useCallback(() => speech.say(voicePhrase(lang, "atSpot"), lang, true), [speech, lang]);
   const onNext = useCallback((place: string | null) => speech.say(voicePhrase(lang, place ? "next" : "finished"), lang), [speech, lang]);
   const onNoHazard = useCallback(() => { setNotice(t("hud.noneSeen")); speech.say(voicePhrase(lang, "noneSeen"), lang); }, [speech, lang, t]);
-  const onSnap = useCallback(() => { setFlash((n) => n + 1); setNotice(t("hud.snapped")); }, [t]);
+  const onSnap = useCallback(() => { activity.current = Date.now(); setFlash((n) => n + 1); setNotice(t("hud.snapped")); }, [t]);
   const { pos, gps, online, spots, hazards, stops, target, alert, finished, capture, getRide } = useRideEngine({ active: riding, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard, onSnap, auto, demo, demoPhotos });
   const nav = useNavigation(pos, target);
   const compass = useCompass(riding);
@@ -115,6 +117,7 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
     events.forEach((e) => { if (e.shot) URL.revokeObjectURL(e.shot); }); // free the last ride's snapshots
     setEvents([]); setLast(null); setNotice(null); setPaused(false);
     startedAt.current = Date.now();
+    activity.current = Date.now();
     setPhase("riding");
     // spoken right away, inside the tap: confirms audio works and tells the rider what happens next
     speech.say(voicePhrase(lang, "start"), lang);
@@ -137,6 +140,20 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
     return () => clearTimeout(id);
   }, [demo, riding, finished, stops.length]);
 
+  // Free filming ends by itself: 25 s after the last accepted photo, or after 5 minutes with nothing happening.
+  const eventsRef = useRef(events);
+  useEffect(() => { eventsRef.current = events; }, [events]);
+  useEffect(() => {
+    if (!riding || demo) return;
+    const id = setInterval(() => {
+      if (paused) { activity.current = Date.now(); return; }
+      const idle = Date.now() - activity.current;
+      const gotOne = eventsRef.current.some((e) => e.kind === "photo" || e.kind === "new");
+      if ((gotOne && idle > 25000) || idle > 300000) endRef.current();
+    }, 5000);
+    return () => clearInterval(id);
+  }, [riding, demo, paused]);
+
   // spoken turn cues, once per maneuver, shortly before it
   const step = nav.step;
   const spokenTurn = useRef("");
@@ -151,10 +168,15 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
   }, [riding, step, target?.atSpot, target?.id, speech, lang]);
 
   // "take a picture here"
-  const onVoiceCapture = useCallback(() => { capture(); speech.say(voicePhrase(lang, "takingPhoto"), lang, true); }, [capture, speech, lang]);
+  const onVoiceCommand = useCallback((intent: "snap" | "end") => {
+    activity.current = Date.now();
+    if (intent === "end") { endRef.current(); return; }
+    capture();
+    speech.say(voicePhrase(lang, "takingPhoto"), lang, true);
+  }, [capture, speech, lang]);
   const onMicUnavailable = useCallback(() => setNotice(t("hud.micUnavailable")), [t]);
   // the microphone is always on during a visit, so the whole thing works hands-free
-  const listening = useVoiceCommand({ on: riding && !demo, getRide, onCommand: onVoiceCapture, onUnavailable: onMicUnavailable, isSpeaking: speech.isSpeaking });
+  const listening = useVoiceCommand({ on: riding && !demo, getRide, onCommand: onVoiceCommand, onUnavailable: onMicUnavailable, isSpeaking: speech.isSpeaking });
   const hearGuide = () => { speech.unlock(); speech.say(voicePhrase(lang, "guide"), lang, true); };
 
   if (phase === "recap") return <Recap demo={demo} demoPhotos={demoPhotos} events={events} seconds={summary.seconds} onAgain={() => setPhase("intro")} />;
@@ -180,7 +202,7 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
           torch={torchSupported ? torchOn : null} onToggleTorch={toggleTorch}
           voiceOn={speech.on} onCapture={capture} listening={demo ? null : listening} auto={auto} onToggleAuto={() => setAuto((a) => !a)} count={events.length} onTogglePause={() => setPaused((p) => !p)} onToggleVoice={() => speech.setOn(!speech.on)} onEnd={end}
         >
-          <NavOverlay pos={pos} compass={compass} target={target} alert={alert} spots={spots} hazards={hazards} nav={nav} finished={finished} free={stops.length === 0 && !demo} />
+          <NavOverlay pos={pos} compass={compass} target={target} alert={alert} spots={spots} hazards={hazards} nav={nav} finished={finished} free={stops.length === 0 && !demo} quiet={Boolean(last)} />
         </RideHud>
       ) : (
         <SafetyIntro
