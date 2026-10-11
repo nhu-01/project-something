@@ -6,6 +6,8 @@ import { Locate, Search } from "@/components/ui/Icons";
 import type { CityReport, Pothole } from "@/lib/data/types";
 import { useI18n } from "@/lib/i18n/client";
 import type { Key } from "@/lib/i18n";
+import { usePermissionStep } from "@/components/ride/PermissionStep";
+import { Camera } from "@/components/ui/Icons";
 import { CitySheet } from "./CityPanels";
 import DetailSheet from "./DetailSheet";
 import MapClient from "./MapClient";
@@ -37,6 +39,8 @@ export default function MapExplorer({ potholes, city }: { potholes: Pothole[]; c
   const [note, setNote] = useState<string | null>(null);
   const [me, setMe] = useState<Me | null>(null);
   const [centerOnMe, setCenterOnMe] = useState(0);
+  const { ask, dialog } = usePermissionStep();
+  const ALL = ["location", "camera", "mic", "compass"] as const;
 
   // The visitor's own location. Asked for only when they tap the button (or if the browser already allows it).
   const watch = useCallback(() => {
@@ -49,7 +53,10 @@ export default function MapExplorer({ potholes, city }: { potholes: Pothole[]; c
   useEffect(() => {
     let stop = () => {};
     let alive = true;
-    navigator.permissions?.query({ name: "geolocation" as PermissionName }).then((p) => { if (alive && p.state === "granted") stop = watch(); }).catch(() => {});
+    // the map is for finding potholes near you, so it asks for your location straight away (unless you already said no)
+    const begin = () => { if (alive) stop = watch(); };
+    if (!navigator.permissions) begin();
+    else navigator.permissions.query({ name: "geolocation" as PermissionName }).then((p) => { if (p.state !== "denied") begin(); }).catch(begin);
     return () => { alive = false; stop(); };
   }, [watch]);
   const locate = () => { if (!me) watch(); setCenterOnMe((n) => n + 1); };
@@ -66,13 +73,17 @@ export default function MapExplorer({ potholes, city }: { potholes: Pothole[]; c
   const clearSelection = useCallback(() => setSelected(null), []);
   const pick = useCallback((s: NonNullable<Selection>) => { setSelected(s); }, []);
 
-  const goToSpot = (r: CityReport) => {
+  const goToSpot = (r: CityReport) => ask([...ALL], () => {
     try { sessionStorage.setItem(MISSION_KEY, JSON.stringify(stopsOf([r]))); } catch { /* storage blocked */ }
     router.push("/capture");
-  };
+  });
+  const startVideo = () => ask([...ALL], () => {
+    try { sessionStorage.removeItem(MISSION_KEY); } catch { /* storage blocked */ }
+    router.push("/capture");
+  });
 
   // Ask where the visitor is, then go to the one nearest 311 spot that still needs a photo.
-  const goNearest = () => {
+  const goNearest = () => ask([...ALL], () => {
     setPlanning(true); setNote(null);
     if (!navigator.geolocation) { setPlanning(false); setNote(t("map.noLocationSupport")); return; }
     navigator.geolocation.getCurrentPosition(async (p) => {
@@ -85,7 +96,7 @@ export default function MapExplorer({ potholes, city }: { potholes: Pothole[]; c
       } catch { setNote(t("map.routeFailed")); }
       finally { setPlanning(false); }
     }, () => { setPlanning(false); setNote(t("map.locationOff")); }, { enableHighAccuracy: true, timeout: 12000 });
-  };
+  });
 
   const nothing = potholes.length === 0 && city.length === 0;
   return (
@@ -125,10 +136,14 @@ export default function MapExplorer({ potholes, city }: { potholes: Pothole[]; c
       {!selected && city.length > 0 && (
         <div className="pointer-events-none absolute inset-x-0 bottom-16 z-[1000] flex flex-col items-center gap-2 px-3 sm:bottom-6">
           {note && <p className="pointer-events-auto max-w-sm rounded-full border border-line bg-card/95 px-4 py-2 text-center text-sm backdrop-blur" role="status">{note}</p>}
-          <button onClick={goNearest} disabled={planning} className="pill pill-ink pointer-events-auto shadow-[0_10px_30px_rgb(32_33_30/0.25)] disabled:opacity-70">{planning ? t("map.finding") : t("map.routeNear")}</button>
+          <div className="pointer-events-auto flex flex-wrap justify-center gap-2">
+            <button onClick={goNearest} disabled={planning} className="pill pill-ink shadow-[0_10px_30px_rgb(32_33_30/0.25)] disabled:opacity-70">{planning ? t("map.finding") : t("map.routeNear")}</button>
+            <button onClick={startVideo} className="pill border border-ink bg-paper text-ink shadow-[0_10px_30px_rgb(32_33_30/0.2)]"><Camera />{t("map.video")}</button>
+          </div>
         </div>
       )}
 
+      {dialog}
       <AnimatePresence>
         {riderSel && <DetailSheet key={`r${riderSel.id}`} pothole={riderSel} onClose={clearSelection} />}
         {citySel && <CitySheet key={`c${citySel.id}`} report={citySel} onClose={clearSelection} onGo={() => goToSpot(citySel)} onPlan={goNearest} planning={planning} />}

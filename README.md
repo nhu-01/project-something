@@ -11,13 +11,16 @@ Live at **spotholes.nyc**. Built for MLH Hack Knight 2026. An independent projec
 
 ## What it does
 
-- **Spot a pothole:** one button, three options: start a video anywhere, go to the nearest reported pothole, or watch a
-  simulated demo (nothing is saved).
+- **Spot a pothole:** one button, three ways in: start a video, go to the nearest reported pothole, or submit a photo or
+  video you already have. One screen asks for location, camera and microphone once, so nothing pops up mid-way.
+- **The map is an entry point too:** it opens on where you are, zooms to the closest reported potholes, and has
+  "go to the nearest pothole" and "start a video" buttons. Tap any spot to be taken to it.
 - **One spot, one visit:** the nearest open 311 report that needs a photo, with turn-by-turn directions
   ([Leaflet Routing Machine](https://www.liedman.net/leaflet-routing-machine/) over OpenStreetMap bike routing), a
   see-through direction arrow and a live mini-map. When the photo is accepted, you're done.
-- **Take the photo hands-free:** the camera checks frames on its own, there is a shutter button, or say
-  "take a picture here" (ElevenLabs speech-to-text).
+- **Hands-free:** the microphone is on during a visit. Say "take a picture here" (ElevenLabs speech-to-text) or tap
+  the shutter; the photo is checked in the background while the camera stays free. An "auto" switch lets the camera
+  pick out potholes by itself too.
 - **Roads only:** an AI judge rejects sidewalks, pavers, plazas, screens and prints. Frames showing faces or license
   plates are never stored.
 - **Letter grades:** severity is shown as A (minor) to E (severe), like the NYC Department of Health letter grades.

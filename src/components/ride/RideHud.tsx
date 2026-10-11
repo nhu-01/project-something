@@ -29,13 +29,14 @@ type Props = {
   count: number;
   onTogglePause: () => void;
   onCapture: () => void; // the shutter
-  mic: boolean | null; // listening for "take a picture here"; null when not offered (demo)
-  onToggleMic: () => void;
+  listening: boolean | null; // the microphone is on, waiting for "take a picture here"; null in the demo
+  auto: boolean; // the camera also picks potholes out by itself
+  onToggleAuto: () => void;
   onToggleVoice: () => void;
   onEnd: () => void;
 };
 
-export default function RideHud({ demo = false, gps, online, last, events, children, notice, paused, voiceOn, torch, onToggleTorch, count, onTogglePause, onToggleVoice, onEnd, onCapture, mic, onToggleMic }: Props) {
+export default function RideHud({ demo = false, gps, online, last, events, children, notice, paused, voiceOn, torch, onToggleTorch, count, onTogglePause, onToggleVoice, onEnd, onCapture, listening, auto, onToggleAuto }: Props) {
   const reduce = useReducedMotion();
   const { t } = useI18n();
   const elapsed = useElapsed(!paused);
@@ -72,7 +73,8 @@ export default function RideHud({ demo = false, gps, online, last, events, child
         <div className="flex items-center gap-2">
           <motion.div key={count} initial={count > 0 && !reduce ? { scale: 1.25 } : false} animate={{ scale: 1 }} transition={{ delay: 1.55, duration: 0.5, ease: [0.16, 1, 0.3, 1] }} className="whitespace-nowrap rounded-full bg-paper/90 px-3 py-2 text-sm text-ink backdrop-blur">{t("hud.logged", { n: count })}</motion.div>
           {torch !== null && <button onClick={onToggleTorch} aria-pressed={torch} aria-label={torch ? t("hud.torchOff") : t("hud.torchOn")} className={`grid h-11 w-11 place-items-center rounded-full backdrop-blur ${torch ? "bg-paper/90 text-ink" : "bg-paper/30 text-paper"}`}><Flashlight /></button>}
-          {mic !== null && <button onClick={onToggleMic} aria-pressed={mic} aria-label={mic ? t("hud.micOff") : t("hud.micOn")} className={`grid h-11 w-11 place-items-center rounded-full backdrop-blur ${mic ? "bg-paper/90 text-ink" : "bg-paper/30 text-paper"}`}><Mic /></button>}
+          {listening !== null && <span role="status" className={`grid h-11 w-11 place-items-center rounded-full backdrop-blur ${listening ? "bg-paper/90 text-ink" : "bg-paper/30 text-paper"}`} aria-label={listening ? t("hud.listening") : t("hud.micOffNow")}><Mic /></span>}
+          <button onClick={onToggleAuto} aria-pressed={auto} aria-label={auto ? t("hud.autoOn") : t("hud.autoOff")} className={`h-11 rounded-full px-3 text-sm font-semibold backdrop-blur ${auto ? "bg-taxi text-ink" : "bg-paper/30 text-paper"}`}>{t("hud.autoLabel")}</button>
           <button onClick={onToggleVoice} aria-pressed={voiceOn} aria-label={voiceOn ? t("hud.mute") : t("hud.unmute")} className={`grid h-11 w-11 place-items-center rounded-full backdrop-blur ${voiceOn ? "bg-paper/90 text-ink" : "bg-paper/30 text-paper"}`}><Volume /></button>
         </div>
       </div>

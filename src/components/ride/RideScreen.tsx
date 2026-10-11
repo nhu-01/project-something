@@ -38,7 +38,8 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
   const [chosenVoice, setChosenVoice] = useState<Voice | null>(null);
   const voice = chosenVoice ?? detectedVoice;
   const [paused, setPaused] = useState(false);
-  const [mic, setMic] = useState(false);
+  const [auto, setAuto] = useState(false); // off: photos are taken when asked for; on: the camera also picks potholes out itself
+  const [flash, setFlash] = useState(0);
   const startedAt = useRef(0);
   const [summary, setSummary] = useState({ seconds: 0 });
   const speech = useSpeech(voice);
@@ -93,7 +94,8 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
   const onAtSpot = useCallback(() => speech.say(voicePhrase(lang, "atSpot"), lang, true), [speech, lang]);
   const onNext = useCallback((place: string | null) => speech.say(voicePhrase(lang, place ? "next" : "finished"), lang), [speech, lang]);
   const onNoHazard = useCallback(() => { setNotice(t("hud.noneSeen")); speech.say(voicePhrase(lang, "noneSeen"), lang); }, [speech, lang, t]);
-  const { pos, gps, online, spots, hazards, stops, target, alert, finished, capture, getRide } = useRideEngine({ active: riding, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard, demo, demoPhotos });
+  const onSnap = useCallback(() => { setFlash((n) => n + 1); setNotice(t("hud.snapped")); }, [t]);
+  const { pos, gps, online, spots, hazards, stops, target, alert, finished, capture, getRide } = useRideEngine({ active: riding, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard, onSnap, auto, demo, demoPhotos });
   const nav = useNavigation(pos, target);
   const compass = useCompass(riding);
 
@@ -150,8 +152,9 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
 
   // "take a picture here"
   const onVoiceCapture = useCallback(() => { capture(); speech.say(voicePhrase(lang, "takingPhoto"), lang, true); }, [capture, speech, lang]);
-  const onMicUnavailable = useCallback(() => { setMic(false); setNotice(t("hud.micUnavailable")); }, [t]);
-  const listening = useVoiceCommand({ on: mic && riding && !demo, getRide, onCommand: onVoiceCapture, onUnavailable: onMicUnavailable });
+  const onMicUnavailable = useCallback(() => setNotice(t("hud.micUnavailable")), [t]);
+  // the microphone is always on during a visit, so the whole thing works hands-free
+  const listening = useVoiceCommand({ on: riding && !demo, getRide, onCommand: onVoiceCapture, onUnavailable: onMicUnavailable, isSpeaking: speech.isSpeaking });
   const hearGuide = () => { speech.unlock(); speech.say(voicePhrase(lang, "guide"), lang, true); };
 
   if (phase === "recap") return <Recap demo={demo} demoPhotos={demoPhotos} events={events} seconds={summary.seconds} onAgain={() => setPhase("intro")} />;
@@ -168,13 +171,14 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
           {cameraState === "denied" ? t("hud.cameraDenied") : t("hud.cameraStarting")}
         </p>
       )}
+      {flash > 0 && <div key={flash} className="demo-anim demo-flash pointer-events-none absolute inset-0 z-10 bg-paper" aria-hidden />}
       <div className={`absolute inset-0 transition-colors duration-500 ${riding ? "bg-ink/25" : "bg-ink/45"}`} aria-hidden />
 
       {riding ? (
         <RideHud
           demo={demo} gps={gps} online={online} last={last} events={events} notice={notice} paused={paused}
           torch={torchSupported ? torchOn : null} onToggleTorch={toggleTorch}
-          voiceOn={speech.on} onCapture={capture} mic={demo ? null : listening || mic} onToggleMic={() => setMic((m) => !m)} count={events.length} onTogglePause={() => setPaused((p) => !p)} onToggleVoice={() => speech.setOn(!speech.on)} onEnd={end}
+          voiceOn={speech.on} onCapture={capture} listening={demo ? null : listening} auto={auto} onToggleAuto={() => setAuto((a) => !a)} count={events.length} onTogglePause={() => setPaused((p) => !p)} onToggleVoice={() => speech.setOn(!speech.on)} onEnd={end}
         >
           <NavOverlay pos={pos} compass={compass} target={target} alert={alert} spots={spots} hazards={hazards} nav={nav} finished={finished} free={stops.length === 0 && !demo} />
         </RideHud>

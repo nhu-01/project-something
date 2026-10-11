@@ -2,29 +2,38 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Close, Camera, Navigate, Volume } from "@/components/ui/Icons";
+import { Close, Camera, Navigate, Upload } from "@/components/ui/Icons";
 import { useI18n } from "@/lib/i18n/client";
 import { MISSION_KEY } from "./engine";
+import { usePermissionStep, type Need } from "./PermissionStep";
 
 type Stop = { id: string; lat: number; lng: number; place: string };
 const keep = (stops: Stop[]) => { try { if (stops.length) sessionStorage.setItem(MISSION_KEY, JSON.stringify(stops)); else sessionStorage.removeItem(MISSION_KEY); } catch { /* storage blocked */ } };
 
-// Goes straight to the camera with one 311 spot as the target.
+// Goes to one 311 spot: permissions first (one screen), then the camera screen with that spot as the destination.
 export function PhotographSpot({ spot, className, children }: { spot: Stop; className?: string; children: ReactNode }) {
   const router = useRouter();
-  return <button type="button" className={className} onClick={() => { keep([spot]); router.push("/capture"); }}>{children}</button>;
+  const { ask, dialog } = usePermissionStep();
+  return (
+    <>
+      <button type="button" className={className} onClick={() => ask(["location", "camera", "mic", "compass"], () => { keep([spot]); router.push("/capture"); })}>{children}</button>
+      {dialog}
+    </>
+  );
 }
 
-// The "spot a pothole" button. It asks how: just film (open camera, ride), or route to the nearest reported
-// potholes and film each one. Both end on the ride screen, which is a video camera.
+// The "spot a pothole" button. Three ways in: see one and film it, be taken to the nearest reported one, or send in a
+// photo or video you already have. (A demo link sits underneath.) Each camera path starts with one permissions screen.
 export function SpotButton({ className, children }: { className?: string; children: ReactNode }) {
   const { t } = useI18n();
   const router = useRouter();
   const reduce = useReducedMotion();
+  const { ask, dialog } = usePermissionStep();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const first = useRef<HTMLButtonElement>(null);
+  const ALL: Need[] = ["location", "camera", "mic", "compass"];
 
   useEffect(() => {
     if (!open) return;
@@ -34,9 +43,10 @@ export function SpotButton({ className, children }: { className?: string; childr
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const video = () => { keep([]); router.push("/capture"); };
+  const video = () => ask(ALL, () => { keep([]); router.push("/capture"); });
+  const manual = () => router.push("/submit");
   const demo = () => { keep([]); router.push("/capture?demo=1"); };
-  const route = () => {
+  const nearest = () => ask(ALL, () => {
     setBusy(true); setNote(null);
     if (!navigator.geolocation) { setBusy(false); setNote(t("map.noLocationSupport")); return; }
     navigator.geolocation.getCurrentPosition(async (p) => {
@@ -49,12 +59,13 @@ export function SpotButton({ className, children }: { className?: string; childr
       } catch { setNote(t("map.routeFailed")); }
       finally { setBusy(false); }
     }, () => { setBusy(false); setNote(t("map.locationOff")); }, { enableHighAccuracy: true, timeout: 12000 });
-  };
+  });
 
   const option = "card flex w-full items-start gap-4 p-5 text-start transition-transform hover:-translate-y-0.5 disabled:opacity-60";
   return (
     <>
       <button type="button" className={className} onClick={() => setOpen(true)}>{children}</button>
+      {dialog}
       <AnimatePresence>
         {open && (
           <motion.div className="fixed inset-0 z-[3500] grid place-items-end bg-ink/45 p-3 sm:place-items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -71,17 +82,18 @@ export function SpotButton({ className, children }: { className?: string; childr
                   <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-ink text-paper"><Camera /></span>
                   <span><span className="block text-[17px] font-medium">{t("spotpick.video")}</span><span className="mt-0.5 block text-sm text-muted">{t("spotpick.videoBody")}</span></span>
                 </button>
-                <button type="button" onClick={route} disabled={busy} className={option}>
+                <button type="button" onClick={nearest} disabled={busy} className={option}>
                   <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-ink text-paper"><Navigate /></span>
                   <span><span className="block text-[17px] font-medium">{busy ? t("spotpick.locating") : t("spotpick.route")}</span><span className="mt-0.5 block text-sm text-muted">{t("spotpick.routeBody")}</span></span>
                 </button>
-                <button type="button" onClick={demo} className={option}>
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-taxi text-ink"><Volume /></span>
-                  <span><span className="block text-[17px] font-medium">{t("spotpick.demo")}</span><span className="mt-0.5 block text-sm text-muted">{t("spotpick.demoBody")}</span></span>
+                <button type="button" onClick={manual} className={option}>
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-ink text-paper"><Upload /></span>
+                  <span><span className="block text-[17px] font-medium">{t("spotpick.manual")}</span><span className="mt-0.5 block text-sm text-muted">{t("spotpick.manualBody")}</span></span>
                 </button>
               </div>
               <p role="status" aria-live="polite" className="mt-3 min-h-5 text-sm text-muted">{note}</p>
               <p className="text-xs text-muted">{t("spotpick.safety")}</p>
+              <button type="button" onClick={demo} className="tap mt-2 text-sm underline underline-offset-4">{t("spotpick.demo")}</button>
             </motion.section>
           </motion.div>
         )}

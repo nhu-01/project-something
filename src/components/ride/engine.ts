@@ -72,13 +72,15 @@ type Opts = {
   onNext: (place: string | null) => void; // moved on to a new target (null: nothing left)
   onNear: (place: string) => void; // a pothole is close by
   onNoHazard: () => void; // a photo asked for by hand showed no road pothole
+  onSnap: () => void; // a photo was just taken by hand; the answer comes later
+  auto: boolean; // also let the camera pick out potholes by itself
   demoPhotos?: string[]; // real rider frames the demo "captures"
   demo?: boolean; // a scripted ride past real 311 spots: no GPS, no camera, nothing is sent or saved
 };
 
 // Runs a ride: follows the rider's GPS, points to the next 311 spot, and sends camera frames to the server, which adds
 // photos to the 311 report you are standing at (or logs a new hazard anywhere else).
-export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard, demo = false, demoPhotos = [] }: Opts) {
+export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard, onSnap, auto, demo = false, demoPhotos = [] }: Opts) {
   const [pos, setPos] = useState<Pos | null>(null);
   const [gps, setGps] = useState<GpsState>("waiting");
   const [online, setOnline] = useState(true);
@@ -90,8 +92,10 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
   const [alert, setAlert] = useState<NearAlert | null>(null);
   const [distanceM, setDistanceM] = useState(0);
 
-  const live = useRef({ paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard });
-  useEffect(() => { live.current = { paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard }; }, [paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard]);
+  const live = useRef({ paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard, onSnap });
+  useEffect(() => { live.current = { paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard, onSnap }; }, [paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard, onSnap]);
+  const autoRef = useRef(auto);
+  useEffect(() => { autoRef.current = auto; }, [auto]);
 
   const photosAt = useRef(new Map<string, number>()); // photos this ride added to each 311 spot
   const doneSet = useRef(new Set<string>()); // spots finished on this visit
@@ -310,7 +314,11 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
       inFlight++;
       try {
         const { blob, luma, aspect } = await grabFrame(video, canvas, tiny);
-        if (blob) { const f = { blob, aspect }; live.current.onLuma(luma); emit((await send(blob))?.event, f); }
+        if (blob) {
+          live.current.onLuma(luma);
+          // frames are only judged when the camera is allowed to pick potholes out by itself
+          if (autoRef.current) { const f = { blob, aspect }; emit((await send(blob))?.event, f); }
+        }
       } finally { inFlight--; }
     }, FRAME_MS);
 
@@ -319,7 +327,7 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
       if (stopped || live.current.paused) return;
       if (demo) {
         const tg = targetRef.current;
-        if (tg) emit({ kind: "photo", source: "311", potholeId: tg.id, hazard: "pothole", street: tg.place, lane: "right lane", severity: 3 }, null, photosRef.current[0]);
+        if (tg) { live.current.onSnap(); setTimeout(() => emit({ kind: "photo", source: "311", potholeId: tg.id, hazard: "pothole", street: tg.place, lane: "right lane", severity: 3 }, null, photosRef.current[0]), 1200); }
         return;
       }
       const video = videoRef.current;
@@ -327,6 +335,7 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
       const { blob, luma, aspect } = await grabFrame(video, canvas, tiny);
       if (!blob) return;
       live.current.onLuma(luma);
+      live.current.onSnap(); // the photo is judged in the background; the camera stays free
       const r = await send(blob, true);
       if (r?.event) emit(r.event, { blob, aspect });
       else if (r?.reason === "no_hazard") live.current.onNoHazard();

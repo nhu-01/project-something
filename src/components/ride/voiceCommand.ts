@@ -11,10 +11,10 @@ type Ride = { rideId: string; token: string } | null;
 
 // Listens for "take a picture here". Only while switched on: the microphone records short clips, loud-enough ones go
 // to ElevenLabs speech-to-text through /api/listen, and only the matching text comes back. Clips are not stored.
-export function useVoiceCommand({ on, getRide, onCommand, onUnavailable }: { on: boolean; getRide: () => Ride; onCommand: () => void; onUnavailable: () => void }) {
+export function useVoiceCommand({ on, getRide, onCommand, onUnavailable, isSpeaking }: { on: boolean; getRide: () => Ride; onCommand: () => void; onUnavailable: () => void; isSpeaking: () => boolean }) {
   const [listening, setListening] = useState(false);
-  const cb = useRef({ getRide, onCommand, onUnavailable });
-  useEffect(() => { cb.current = { getRide, onCommand, onUnavailable }; }, [getRide, onCommand, onUnavailable]);
+  const cb = useRef({ getRide, onCommand, onUnavailable, isSpeaking });
+  useEffect(() => { cb.current = { getRide, onCommand, onUnavailable, isSpeaking }; }, [getRide, onCommand, onUnavailable, isSpeaking]);
 
   useEffect(() => {
     if (!on) return;
@@ -40,8 +40,9 @@ export function useVoiceCommand({ on, getRide, onCommand, onUnavailable }: { on:
         if (stopped || !stream) return;
         const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
         const chunks: Blob[] = [];
-        let peak = 0;
+        let peak = 0, talking = false; // `talking`: the app itself was speaking, so this clip is not the user
         const meter = setInterval(() => {
+          if (cb.current.isSpeaking()) talking = true;
           analyser.getByteTimeDomainData(buf);
           let max = 0;
           for (const v of buf) max = Math.max(max, Math.abs(v - 128) / 128);
@@ -52,7 +53,7 @@ export function useVoiceCommand({ on, getRide, onCommand, onUnavailable }: { on:
           clearInterval(meter);
           if (!stopped) loop = setTimeout(clip, 0);
           const ride = cb.current.getRide();
-          if (peak < LOUD || !ride) return;
+          if (peak < LOUD || !ride || talking) return;
           const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
           const form = new FormData();
           form.append("rideId", ride.rideId); form.append("token", ride.token);
