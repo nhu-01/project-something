@@ -23,7 +23,7 @@ export function PhotographSpot({ spot, className, children }: { spot: Stop; clas
 }
 
 // The "spot a pothole" button. Three ways in: see one and film it, be taken to the nearest reported one, or send in a
-// photo or video you already have. (A demo link sits underneath.) Each camera path starts with one permissions screen.
+// photo or video you already have. Each camera path starts with one permissions screen.
 export function SpotButton({ className, children }: { className?: string; children: ReactNode }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -45,7 +45,6 @@ export function SpotButton({ className, children }: { className?: string; childr
 
   const video = () => ask(ALL, () => { keep([]); router.push("/capture"); });
   const manual = () => router.push("/submit");
-  const demo = () => { keep([]); router.push("/capture?demo=1"); };
   const nearest = () => ask(ALL, () => {
     setBusy(true); setNote(null);
     if (!navigator.geolocation) { setBusy(false); setNote(t("map.noLocationSupport")); return; }
@@ -93,7 +92,6 @@ export function SpotButton({ className, children }: { className?: string; childr
               </div>
               <p role="status" aria-live="polite" className="mt-3 min-h-5 text-sm text-muted">{note}</p>
               <p className="text-xs text-muted">{t("spotpick.safety")}</p>
-              <button type="button" onClick={demo} className="tap mt-2 text-sm underline underline-offset-4">{t("spotpick.demo")}</button>
             </motion.section>
           </motion.div>
         )}

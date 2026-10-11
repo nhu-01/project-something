@@ -26,7 +26,7 @@ const save = (key: string, value: string) => { try { localStorage.setItem(key, v
 
 // The camera opens straight away. Setup is a pop-up over it; "start ride" swaps the pop-up for the ride display.
 // intro (camera + setup pop-up) → riding → recap.
-export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: boolean; demoPhotos?: string[] }) {
+export default function RideScreen() {
   const [phase, setPhase] = useState<Phase>("intro");
   const [events, setEvents] = useState<RideEvent[]>([]);
   const [last, setLast] = useState<RideEvent | null>(null);
@@ -38,7 +38,6 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
   const [chosenVoice, setChosenVoice] = useState<Voice | null>(null);
   const voice = chosenVoice ?? detectedVoice;
   const [paused, setPaused] = useState(false);
-  const [auto, setAuto] = useState(false); // off: photos are taken when asked for; on: the camera also picks potholes out itself
   const [flash, setFlash] = useState(0);
   const startedAt = useRef(0);
   const activity = useRef(0); // last photo, snap or command; the visit ends by itself when it goes quiet
@@ -46,7 +45,7 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
   const speech = useSpeech(voice);
   const riding = phase === "riding";
 
-  const { ref: videoRef, state: cameraState, torchSupported, torchOn, setTorch } = useCamera(phase !== "recap" && !demo);
+  const { ref: videoRef, state: cameraState, torchSupported, torchOn, setTorch } = useCamera(phase !== "recap");
   useWakeLock(riding);
 
   const onResult = useCallback((e: RideEvent) => {
@@ -97,7 +96,7 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
   const onNext = useCallback((place: string | null) => speech.say(voicePhrase(lang, place ? "next" : "finished"), lang), [speech, lang]);
   const onNoHazard = useCallback(() => { setNotice(t("hud.noneSeen")); speech.say(voicePhrase(lang, "noneSeen"), lang); }, [speech, lang, t]);
   const onSnap = useCallback(() => { activity.current = Date.now(); setFlash((n) => n + 1); setNotice(t("hud.snapped")); }, [t]);
-  const { pos, gps, online, spots, hazards, stops, target, alert, finished, capture, getRide } = useRideEngine({ active: riding, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard, onSnap, auto, demo, demoPhotos });
+  const { pos, gps, online, spots, hazards, stops, target, alert, finished, capture, getRide } = useRideEngine({ active: riding, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard, onSnap, auto: true });
   const nav = useNavigation(pos, target);
   const compass = useCompass(riding);
 
@@ -130,21 +129,20 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
     setSummary({ seconds: Math.round((Date.now() - startedAt.current) / 1000) });
     setPhase("recap");
   };
-  // The demo wraps up on its own once every spot on the loop has its photos.
   const endRef = useRef(end);
   useEffect(() => { endRef.current = end; });
   useEffect(() => {
     // (and so does a visit to one chosen spot: photo added, that's it)
-    if (!riding || !finished || !(demo || stops.length > 0)) return;
-    const id = setTimeout(() => endRef.current(), demo ? 4000 : 3000);
+    if (!riding || !finished || stops.length === 0) return;
+    const id = setTimeout(() => endRef.current(), 3000);
     return () => clearTimeout(id);
-  }, [demo, riding, finished, stops.length]);
+  }, [riding, finished, stops.length]);
 
   // Free filming ends by itself: 25 s after the last accepted photo, or after 5 minutes with nothing happening.
   const eventsRef = useRef(events);
   useEffect(() => { eventsRef.current = events; }, [events]);
   useEffect(() => {
-    if (!riding || demo) return;
+    if (!riding) return;
     const id = setInterval(() => {
       if (paused) { activity.current = Date.now(); return; }
       const idle = Date.now() - activity.current;
@@ -152,7 +150,7 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
       if ((gotOne && idle > 25000) || idle > 300000) endRef.current();
     }, 5000);
     return () => clearInterval(id);
-  }, [riding, demo, paused]);
+  }, [riding, paused]);
 
   // spoken turn cues, once per maneuver, shortly before it
   const step = nav.step;
@@ -176,18 +174,16 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
   }, [capture, speech, lang]);
   const onMicUnavailable = useCallback(() => setNotice(t("hud.micUnavailable")), [t]);
   // the microphone is always on during a visit, so the whole thing works hands-free
-  const listening = useVoiceCommand({ on: riding && !demo, getRide, onCommand: onVoiceCommand, onUnavailable: onMicUnavailable, isSpeaking: speech.isSpeaking });
+  const listening = useVoiceCommand({ on: riding, getRide, onCommand: onVoiceCommand, onUnavailable: onMicUnavailable, isSpeaking: speech.isSpeaking });
   const hearGuide = () => { speech.unlock(); speech.say(voicePhrase(lang, "guide"), lang, true); };
 
-  if (phase === "recap") return <Recap demo={demo} demoPhotos={demoPhotos} events={events} seconds={summary.seconds} onAgain={() => setPhase("intro")} />;
+  if (phase === "recap") return <Recap events={events} seconds={summary.seconds} onAgain={() => setPhase("intro")} />;
 
   return (
     <div className="fixed inset-0 z-[3000] bg-ink text-paper">
       {/* one camera for both setup and the ride, so it never restarts in between */}
       <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" playsInline muted autoPlay aria-hidden />
-      {demo && demoPhotos[0] && <img src={demoPhotos[0]} alt="" className="absolute inset-0 h-full w-full object-cover" />}
-      {demo && !demoPhotos[0] && <div className="absolute inset-0 bg-[linear-gradient(180deg,#2b2c28,#1a1b19)]" aria-hidden><div className="absolute inset-y-0 left-1/2 w-[3px] -translate-x-1/2 bg-[repeating-linear-gradient(180deg,rgba(250,250,247,.35)_0_40px,transparent_40px_80px)]" /></div>}
-      {!demo && cameraState !== "on" && (
+      {cameraState !== "on" && (
         // out of the way at the top, so it never lands behind the setup card
         <p role="status" className="absolute inset-x-6 text-center text-sm text-paper/70" style={{ top: "calc(env(safe-area-inset-top) + 84px)" }}>
           {cameraState === "denied" ? t("hud.cameraDenied") : t("hud.cameraStarting")}
@@ -198,15 +194,15 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
 
       {riding ? (
         <RideHud
-          demo={demo} gps={gps} online={online} last={last} events={events} notice={notice} paused={paused}
+          gps={gps} online={online} last={last} events={events} notice={notice} paused={paused}
           torch={torchSupported ? torchOn : null} onToggleTorch={toggleTorch}
-          voiceOn={speech.on} onCapture={capture} listening={demo ? null : listening} auto={auto} onToggleAuto={() => setAuto((a) => !a)} count={events.length} onTogglePause={() => setPaused((p) => !p)} onToggleVoice={() => speech.setOn(!speech.on)} onEnd={end}
+          voiceOn={speech.on} onCapture={capture} listening={listening} count={events.length} onTogglePause={() => setPaused((p) => !p)} onToggleVoice={() => speech.setOn(!speech.on)} onEnd={end}
         >
-          <NavOverlay pos={pos} compass={compass} target={target} alert={alert} spots={spots} hazards={hazards} nav={nav} finished={finished} free={stops.length === 0 && !demo} quiet={Boolean(last)} />
+          <NavOverlay pos={pos} compass={compass} target={target} alert={alert} spots={spots} hazards={hazards} nav={nav} finished={finished} free={stops.length === 0} quiet={Boolean(last)} />
         </RideHud>
       ) : (
         <SafetyIntro
-          onStart={start} demo={demo}
+          onStart={start}
           voice={voice} onVoice={(v) => { setChosenVoice(v); save("spotholes-voice", v); }}
           onHearGuide={hearGuide}
         />

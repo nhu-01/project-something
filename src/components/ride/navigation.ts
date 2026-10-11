@@ -4,7 +4,7 @@ import { meters } from "./engine";
 import type { Pos } from "./types";
 
 // Turn-by-turn directions with Leaflet Routing Machine (an open-source routing client) against the public
-// OpenStreetMap bike-routing server. No account or key.
+// OpenStreetMap bike-routing server (no key), or Mapbox cycling directions when NEXT_PUBLIC_MAPBOX_TOKEN is set.
 export type TurnKind = "straight" | "left" | "right" | "bearLeft" | "bearRight" | "sharpLeft" | "sharpRight" | "uturn" | "arrive";
 export type NavStep = { kind: TurnKind; road: string; meters: number };
 export type NavState = { coords: [number, number][]; step: NavStep | null; remainingM: number | null; failed: boolean };
@@ -34,19 +34,29 @@ async function plan(from: { lat: number; lng: number }, to: { lat: number; lng: 
   // the plugin looks for a global L when it loads
   (globalThis as { L?: typeof L }).L = L;
   await import("leaflet-routing-machine");
-  const router = L.Routing.osrmv1({ serviceUrl: SERVICE, profile: "driving", timeout: 8000 });
-  return new Promise((resolve) => {
-    router.route([L.Routing.waypoint(L.latLng(from.lat, from.lng)), L.Routing.waypoint(L.latLng(to.lat, to.lng))], (...args: unknown[]) => {
-      const [err, routes] = args as [unknown, LrmRoute[] | undefined];
-      const r = !err && routes?.[0];
-      if (!r) return resolve(null);
-      resolve({
-        coords: r.coordinates.map((c) => [c.lat, c.lng] as [number, number]),
-        steps: r.instructions.map((i) => ({ index: i.index, kind: kindOf(String(i.type)), road: i.road || "" })),
-        totalM: r.summary.totalDistance,
+  const waypoints = [L.Routing.waypoint(L.latLng(from.lat, from.lng)), L.Routing.waypoint(L.latLng(to.lat, to.lng))];
+
+  const ask = (router: { route: (w: typeof waypoints, cb: (...args: unknown[]) => void) => unknown }) =>
+    new Promise<Planned | null>((resolve) => {
+      router.route(waypoints, (...args: unknown[]) => {
+        const [err, routes] = args as [unknown, LrmRoute[] | undefined];
+        const r = !err && routes?.[0];
+        if (!r) return resolve(null);
+        resolve({
+          coords: r.coordinates.map((c) => [c.lat, c.lng] as [number, number]),
+          steps: r.instructions.map((i) => ({ index: i.index, kind: kindOf(String(i.type)), road: i.road || "" })),
+          totalM: r.summary.totalDistance,
+        });
       });
     });
-  });
+
+  // Mapbox (cycling profile) when a public token is configured; the open OSRM server otherwise, or if Mapbox fails
+  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+  if (token) {
+    const viaMapbox = await ask(L.Routing.mapbox(token, { profile: "mapbox/cycling" }) as never);
+    if (viaMapbox) return viaMapbox;
+  }
+  return ask(L.Routing.osrmv1({ serviceUrl: SERVICE, profile: "driving", timeout: 8000 }) as never);
 }
 
 // Follows the rider along a route to `target`: asks for directions when the target changes, asks again if they wander

@@ -3,14 +3,13 @@ import Link from "next/link";
 import { useState } from "react";
 import ShotViewer, { type Shot } from "./ShotViewer";
 import Reveal from "@/components/ui/Reveal";
-import DemoFinale from "./DemoFinale";
 import { ArrowUpRight } from "@/components/ui/Icons";
 import { useI18n } from "@/lib/i18n/client";
 import { plural, type Key } from "@/lib/i18n";
 import { GRADE } from "@/lib/tokens";
 import type { RideEvent } from "./types";
 
-export default function Recap({ events, seconds, onAgain, demo = false, demoPhotos = [] }: { events: RideEvent[]; seconds: number; onAgain: () => void; demo?: boolean; demoPhotos?: string[] }) {
+export default function Recap({ events, seconds, onAgain }: { events: RideEvent[]; seconds: number; onAgain: () => void }) {
   const { t } = useI18n();
   const count = (k: RideEvent["kind"]) => events.filter((e) => e.kind === k).length;
   const kindLabel = (k: RideEvent["kind"]) => t(`kind.${k}` as Key);
@@ -29,7 +28,6 @@ export default function Recap({ events, seconds, onAgain, demo = false, demoPhot
           <h1 className="h2 mt-2">{events.length ? plural(t, "recap.titleHelped", events.length) : t("recap.titleSmooth")}</h1>
           <p className="mt-3 text-muted">{events.length ? `${t("recap.summary", { photos: count("photo"), new: count("new"), none: count("not_found") })}${shots.length ? ` ${t("recap.tap")}` : ""}` : t("recap.nothing")}</p>
         </Reveal>
-        {demo && <DemoFinale photos={demoPhotos} />}
         <Reveal delay={0.08}>
           <dl className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-3xl border border-line bg-line sm:grid-cols-3">
             {stats.map(([k, v]) => (<div key={k} className="bg-card p-4"><dd className="text-2xl font-medium">{v}</dd><dt className="text-sm text-muted">{k}</dt></div>))}
