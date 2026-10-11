@@ -1,5 +1,4 @@
 "use client";
-import L from "leaflet";
 import { useEffect, useRef, useState } from "react";
 import { meters } from "./engine";
 import type { Pos } from "./types";
@@ -30,6 +29,8 @@ type LrmRoute = { coordinates: { lat: number; lng: number }[]; instructions: { i
 type Planned = { coords: [number, number][]; steps: { index: number; kind: TurnKind; road: string }[]; totalM: number };
 
 async function plan(from: { lat: number; lng: number }, to: { lat: number; lng: number }): Promise<Planned | null> {
+  // leaflet touches `window` when it loads, so it is only imported here, in the browser, when directions are needed
+  const L = (await import("leaflet")).default;
   // the plugin looks for a global L when it loads
   (globalThis as { L?: typeof L }).L = L;
   await import("leaflet-routing-machine");
