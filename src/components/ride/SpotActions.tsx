@@ -2,7 +2,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Close, Camera, Navigate, Volume } from "@/components/ui/Icons";
+import { Close, Camera, Navigate, Upload } from "@/components/ui/Icons";
 import { useI18n } from "@/lib/i18n/client";
 import { MISSION_KEY } from "./engine";
 
@@ -35,7 +35,7 @@ export function SpotButton({ className, children }: { className?: string; childr
   }, [open]);
 
   const video = () => { keep([]); router.push("/ride"); };
-  const demo = () => { keep([]); router.push("/ride?demo=1"); };
+  const manual = () => router.push("/submit");
   const route = () => {
     setBusy(true); setNote(null);
     if (!navigator.geolocation) { setBusy(false); setNote(t("map.noLocationSupport")); return; }
@@ -44,7 +44,8 @@ export function SpotButton({ className, children }: { className?: string; childr
         const res = await fetch(`/api/mission?lat=${p.coords.latitude}&lng=${p.coords.longitude}`);
         const m = (await res.json()) as { stops?: Stop[] };
         if (!res.ok || !m.stops?.length) { setNote(t("map.noneNear")); return; }
-        keep(m.stops.map(({ id, lat, lng, place }) => ({ id, lat, lng, place })));
+        // one spot only: the best one for this person (closest, fewest photos)
+        keep(m.stops.slice(0, 1).map(({ id, lat, lng, place }) => ({ id, lat, lng, place })));
         router.push("/ride");
       } catch { setNote(t("map.routeFailed")); }
       finally { setBusy(false); }
@@ -75,9 +76,9 @@ export function SpotButton({ className, children }: { className?: string; childr
                   <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-ink text-paper"><Navigate /></span>
                   <span><span className="block text-[17px] font-medium">{busy ? t("spotpick.locating") : t("spotpick.route")}</span><span className="mt-0.5 block text-sm text-muted">{t("spotpick.routeBody")}</span></span>
                 </button>
-                <button type="button" onClick={demo} className={option}>
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-taxi text-ink"><Volume /></span>
-                  <span><span className="block text-[17px] font-medium">{t("spotpick.demo")}</span><span className="mt-0.5 block text-sm text-muted">{t("spotpick.demoBody")}</span></span>
+                <button type="button" onClick={manual} className={option}>
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-ink text-paper"><Upload /></span>
+                  <span><span className="block text-[17px] font-medium">{t("spotpick.manual")}</span><span className="mt-0.5 block text-sm text-muted">{t("spotpick.manualBody")}</span></span>
                 </button>
               </div>
               <p role="status" aria-live="polite" className="mt-3 min-h-5 text-sm text-muted">{note}</p>

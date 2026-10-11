@@ -89,7 +89,10 @@ export default function MapExplorer({ potholes, city }: { potholes: Pothole[]; c
         const res = await fetch(`/api/mission?lat=${p.coords.latitude}&lng=${p.coords.longitude}`);
         const m = (await res.json()) as Mission;
         if (!res.ok || !m.stops?.length) { setNote(t("map.noneNear")); return; }
-        setMission(m); setSelected(null);
+        // one spot only: the best one for this person, straight to the camera screen
+        const first = m.stops[0];
+        try { sessionStorage.setItem(MISSION_KEY, JSON.stringify(stopsOf([first]))); } catch { /* storage blocked */ }
+        router.push("/ride");
       } catch { setNote(t("map.routeFailed")); }
       finally { setPlanning(false); }
     }, () => { setPlanning(false); setNote(t("map.locationOff")); }, { enableHighAccuracy: true, timeout: 12000 });

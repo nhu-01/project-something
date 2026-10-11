@@ -95,7 +95,7 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
   const onNext = useCallback((place: string | null) => speech.say(voicePhrase(lang, place ? "next" : "finished"), lang), [speech, lang]);
   const onSnap = useCallback(() => { setFlash((n) => n + 1); setNotice(t("hud.snapped")); }, [t]);
   const onNoHazard = useCallback(() => { setNotice(t("hud.noneSeen")); speech.say(voicePhrase(lang, "noneSeen"), lang); }, [speech, lang, t]);
-  const { pos, gps, online, spots, hazards, stops, target, alert, skip, finished, capture, getRide } = useRideEngine({ active: riding, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard, onSnap, demo, demoPhotos });
+  const { pos, gps, online, spots, hazards, stops, target, alert, finished, capture, getRide } = useRideEngine({ active: riding, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard, onSnap, demo, demoPhotos });
 
   // Hands-free backup for when the camera doesn't pick a pothole out by itself: say "take a picture here".
   const onVoiceCommand = useCallback(() => { capture(); speech.say(voicePhrase(lang, "takingPhoto"), lang, true); }, [capture, speech, lang]);
@@ -137,10 +137,10 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
   const endRef = useRef(end);
   useEffect(() => { endRef.current = end; });
   useEffect(() => {
-    if (!demo || !riding || !finished) return;
-    const id = setTimeout(() => endRef.current(), 4000);
+    if (!riding || !finished || !(demo || stops.length > 0)) return;
+    const id = setTimeout(() => endRef.current(), demo ? 4000 : 3000);
     return () => clearTimeout(id);
-  }, [demo, riding, finished]);
+  }, [demo, riding, finished, stops.length]);
   const hearGuide = () => { speech.unlock(); speech.say(voicePhrase(lang, "guide"), lang, true); };
 
   if (phase === "recap") return <Recap demo={demo} demoPhotos={demoPhotos} events={events} seconds={summary.seconds} onAgain={() => { setRoute(null); setPhase("intro"); }} />;
@@ -166,7 +166,7 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
           torch={torchSupported ? torchOn : null} onToggleTorch={toggleTorch}
           voiceOn={speech.on} count={events.length} onTogglePause={() => setPaused((p) => !p)} onToggleVoice={() => speech.setOn(!speech.on)} onEnd={end}
         >
-          <NavOverlay pos={pos} compass={compass} target={target} alert={alert} spots={spots} hazards={hazards} stops={stops} finished={finished} onSkip={skip} />
+          <NavOverlay pos={pos} compass={compass} target={target} alert={alert} spots={spots} hazards={hazards} stops={stops} finished={finished} />
         </RideHud>
       ) : (
         <SafetyIntro

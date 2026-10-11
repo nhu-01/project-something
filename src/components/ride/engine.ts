@@ -8,7 +8,7 @@ type ServerEvent = {
 
 const FRAME_MS = 800; // how often a frame is taken
 const MAX_IN_FLIGHT = 2; // frames being checked at once, so a slow answer doesn't stall the camera
-const NEEDED = 2; // photos from one pass that count as "done" at a 311 spot
+const NEEDED = 1; // one accepted photo finishes the visit to a chosen spot
 const FT = 3.28084;
 const SIM_SPEED = 9; // m/s in the demo: brisk, so the loop takes about a minute
 export const MISSION_KEY = "spotholes-mission"; // stops chosen on the map or from a destination

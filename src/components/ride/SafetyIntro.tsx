@@ -5,7 +5,7 @@ import { useState } from "react";
 import { ArrowUpRight, Close, Volume } from "@/components/ui/Icons";
 import { useI18n } from "@/lib/i18n/client";
 import type { Key } from "@/lib/i18n";
-import Destination, { type PlannedRoute } from "./Destination";
+import type { PlannedRoute } from "./Destination";
 
 const CHECKS = ["ride.check1", "ride.check2", "ride.check3"] as const;
 
@@ -18,7 +18,7 @@ type Props = {
 };
 
 // Setup, shown as a pop-up over the live camera: destination search on top, safety checks and voice choices below.
-export default function SafetyIntro({ onStart, demo = false, voice, onVoice, onHearGuide, onRoute }: Props) {
+export default function SafetyIntro({ onStart, demo = false, voice, onVoice, onHearGuide }: Props) {
   const reduce = useReducedMotion();
   const { t } = useI18n();
   const [checked, setChecked] = useState<boolean[]>(CHECKS.map(() => false));
@@ -27,7 +27,7 @@ export default function SafetyIntro({ onStart, demo = false, voice, onVoice, onH
     <div className="absolute inset-0 flex flex-col justify-between gap-3 p-3" style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)", paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}>
       <div className="flex items-start gap-2">
         <Link href="/" aria-label={t("ride.leave")} className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-paper text-ink"><Close /></Link>
-        <div className="min-w-0 flex-1">{demo ? <p className="rounded-full bg-taxi px-4 py-3 text-sm font-medium text-ink">{t("demo.tag")}</p> : <Destination compact onRoute={onRoute} />}</div>
+        <div className="min-w-0 flex-1">{demo ? <p className="rounded-full bg-taxi px-4 py-3 text-sm font-medium text-ink">{t("demo.tag")}</p> : null}</div>
       </div>
 
       <motion.section

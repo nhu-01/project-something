@@ -15,12 +15,12 @@ const turn = (to: number, from: number) => ((((to - from) % 360) + 540) % 360) -
 
 type Props = {
   pos: Pos | null; compass: number | null; target: NavTarget | null; alert: NearAlert | null;
-  spots: Spot[]; hazards: NearbyHazard[]; stops: Spot[]; finished: boolean; onSkip: () => void;
+  spots: Spot[]; hazards: NearbyHazard[]; stops: Spot[]; finished: boolean;
 };
 
 // The see-through navigation layer on top of the camera: an arrow to the next 311 spot (like Find My), how far it
 // is, a small live map, and a second arrow when another pothole is close. Glass panels keep the road visible.
-export default function NavOverlay({ pos, compass, target, alert, spots, hazards, stops, finished, onSkip }: Props) {
+export default function NavOverlay({ pos, compass, target, alert, spots, hazards, stops, finished }: Props) {
   const { t } = useI18n();
   const reduce = useReducedMotion();
   const [big, setBig] = useState(false);
@@ -47,10 +47,7 @@ export default function NavOverlay({ pos, compass, target, alert, spots, hazards
                 <p className="text-3xl font-medium tabular-nums leading-tight tracking-tight">{distance(target.meters)}</p>
               </div>
             </div>
-            <div className="mt-2 flex items-center justify-between gap-3">
-              <p className="text-sm text-paper/80">{t("hud.photosHere", { n: target.photosHere, total: target.needed })}{target.photos ? ` · ${plural(t, "hud.photoCount", target.photos)}` : ""}</p>
-              <button type="button" onClick={onSkip} className="pill min-h-11 shrink-0 whitespace-nowrap border border-paper/40 bg-transparent px-4 text-paper">{t("hud.skip")}</button>
-            </div>
+            <p className="mt-2 text-sm text-paper/80">{t("hud.photosHere", { n: target.photosHere, total: target.needed })}{target.photos ? ` · ${plural(t, "hud.photoCount", target.photos)}` : ""}</p>
           </div>
         ) : (
           <p className={`pointer-events-auto max-w-md rounded-full px-5 py-3 text-center text-[15px] ${glass}`} role="status">
