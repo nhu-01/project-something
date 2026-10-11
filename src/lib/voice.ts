@@ -9,7 +9,7 @@ export { LANG_CODES, LANGS, isLang, type Lang };
 export type VoiceKey =
   | "start" | "gps" | "done" | "guide" | "near" | "spotAhead" | "atSpot" | "photo" | "notFound"
   | "new" | "confirmed" | "repaired" | "screen" | "next" | "finished"
-  | "demo1" | "demo2" | "demo3" | "demo4" | "demo5";
+  | "demo1" | "demo2" | "demo3" | "demo4" | "demo5" | "takingPhoto" | "noneSeen";
 export type ResultKind = "new" | "confirmed" | "worse" | "better" | "repaired" | "photo" | "not_found";
 
 const BRIEF_MAX = 20;

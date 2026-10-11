@@ -71,13 +71,15 @@ type Opts = {
   onAtSpot: (place: string) => void; // arrived at it
   onNext: (place: string | null) => void; // moved on to a new target (null: nothing left)
   onNear: (place: string) => void; // a pothole is close by
+  onNoHazard: () => void; // a photo asked for by voice showed no road pothole
+  onSnap: () => void; // a photo was just taken on request; the answer comes later
   demoPhotos?: string[]; // real rider frames the demo "captures"
   demo?: boolean; // a scripted ride past real 311 spots: no GPS, no camera, nothing is sent or saved
 };
 
 // Runs a ride: follows the rider's GPS, points to the next 311 spot, and sends camera frames to the server, which adds
 // photos to the 311 report you are standing at (or logs a new hazard anywhere else).
-export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, demo = false, demoPhotos = [] }: Opts) {
+export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard, onSnap, demo = false, demoPhotos = [] }: Opts) {
   const [pos, setPos] = useState<Pos | null>(null);
   const [gps, setGps] = useState<GpsState>("waiting");
   const [online, setOnline] = useState(true);
@@ -90,8 +92,8 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
   const [distanceM, setDistanceM] = useState(0);
   const [skipTick, setSkipTick] = useState(0);
 
-  const live = useRef({ paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear });
-  useEffect(() => { live.current = { paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear }; }, [paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear]);
+  const live = useRef({ paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard, onSnap });
+  useEffect(() => { live.current = { paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard, onSnap }; }, [paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard, onSnap]);
 
   const photosAt = useRef(new Map<string, number>()); // photos this ride added to each 311 spot
   const doneSet = useRef(new Set<string>()); // spots finished or skipped on this ride
@@ -103,6 +105,11 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
   useEffect(() => { photosRef.current = demoPhotos; }, [demoPhotos]);
   const spotsRef = useRef<Spot[]>([]); // read by the timer, which must not run inside a state updater
   const hazardsRef = useRef<NearbyHazard[]>([]);
+
+  const captureRef = useRef<(() => void) | null>(null); // takes a photo right now
+  const rideRef = useRef<{ rideId: string; token: string } | null>(null);
+  const capture = useCallback(() => captureRef.current?.(), []);
+  const getRide = useCallback(() => rideRef.current, []);
 
   const skip = useCallback(() => { skipRequested.current = true; setSkipTick((n) => n + 1); }, []);
 
@@ -126,7 +133,7 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
       startingRide = true;
       try {
         const r = await fetch("/api/rides", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ deviceId: deviceId() }) });
-        if (r.ok && !stopped) { ride = await r.json(); setOnline(true); } else if (!r.ok) setOnline(false);
+        if (r.ok && !stopped) { ride = await r.json(); rideRef.current = ride; setOnline(true); } else if (!r.ok) setOnline(false);
       } catch { setOnline(false); }
       startingRide = false;
     };
@@ -146,7 +153,7 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
       });
     };
 
-    const send = async (frame: Blob) => {
+    const send = async (frame: Blob, manual = false) => {
       const p = posRef.current;
       if (!ride || !p) return null;
       const form = new FormData();
@@ -155,14 +162,15 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
       if (p.heading != null) form.append("heading", String(p.heading));
       if (p.accuracy != null) form.append("accuracy", String(p.accuracy));
       form.append("frame", frame, "frame.jpg");
+      if (manual) form.append("manual", "1");
       try {
         const res = await fetch("/api/scan", { method: "POST", body: form });
-        if (res.status === 401) { ride = null; void ensureRide(); return null; } // the server lost this ride: start a fresh one
+        if (res.status === 401) { ride = null; rideRef.current = null; void ensureRide(); return null; } // the server lost this ride: start a fresh one
         setOnline(res.ok);
         if (!res.ok) return null;
-        const body = (await res.json()) as { event: ServerEvent | null; hint?: "screen" };
+        const body = (await res.json()) as { event: ServerEvent | null; hint?: "screen"; reason?: "no_hazard" };
         if (body.hint && !stopped && Date.now() - lastHint > 20000) { lastHint = Date.now(); live.current.onHint(body.hint); }
-        return body.event;
+        return body;
       } catch { setOnline(false); return null; }
     };
 
@@ -311,13 +319,29 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
       inFlight++;
       try {
         const { blob, luma, aspect } = await grabFrame(video, canvas, tiny);
-        if (blob) { const f = { blob, aspect }; live.current.onLuma(luma); emit(await send(blob), f); }
+        if (blob) { const f = { blob, aspect }; live.current.onLuma(luma); emit((await send(blob))?.event, f); }
       } finally { inFlight--; }
     }, FRAME_MS);
+
+    // a photo on request ("take a picture here"): sent right away, ignoring the pacing rules
+    captureRef.current = async () => {
+      if (stopped || live.current.paused) return;
+      if (demo) { live.current.onNoHazard(); return; }
+      const video = videoRef.current;
+      if (!video || !ride || !posRef.current) { live.current.onNoHazard(); return; }
+      const { blob, luma, aspect } = await grabFrame(video, canvas, tiny);
+      if (!blob) return;
+      live.current.onLuma(luma);
+      live.current.onSnap(); // judged in the background; the camera stays free
+      const r = await send(blob, true);
+      if (r?.event) emit(r.event, { blob, aspect });
+      else if (r?.reason === "no_hazard") live.current.onNoHazard();
+    };
 
     return () => {
       stopped = true;
       clearInterval(tick);
+      captureRef.current = null;
       if (frameTimer) clearInterval(frameTimer);
       if (rideTimer) clearInterval(rideTimer);
       if (simTimer) clearInterval(simTimer);
@@ -329,5 +353,5 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
     };
   }, [active, videoRef, demo]);
 
-  return { pos, gps, online, spots, hazards, stops, target, alert, distanceM, skip, skipTick, finished };
+  return { pos, gps, online, spots, hazards, stops, target, alert, distanceM, skip, skipTick, finished, capture, getRide };
 }

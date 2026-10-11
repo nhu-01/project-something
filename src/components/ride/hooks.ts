@@ -160,5 +160,8 @@ export function useSpeech(voice: "f" | "m") {
 
   const stop = useCallback(() => { queue.current = []; turn.current++; busy.current = false; silence(audio.current); }, []);
 
-  return { on, setOn, say, unlock, stop };
+  // true while a line is playing or waiting; the microphone ignores what it hears at those moments
+  const isSpeaking = useCallback(() => busy.current || queue.current.length > 0, []);
+
+  return { on, setOn, say, unlock, stop, isSpeaking };
 }

@@ -168,3 +168,7 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
 @keyframes demo-tap { 0% { opacity: 0.9; transform: translateY(-50%) scale(0.5); } 100% { opacity: 0; transform: translateY(-50%) scale(1.8); } }
 @keyframes demo-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @media (prefers-reduced-motion: reduce) { .demo-anim { animation: none !important; opacity: 1 !important; transform: none !important; } .demo-flash { opacity: 0 !important; } .demo-tap { opacity: 0 !important; } }
+
+/* the screen blink when a photo is taken on request */
+@keyframes snapflash { 0% { opacity: 0; } 30% { opacity: 0.8; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { [class*="snapflash"] { animation: none !important; opacity: 0 !important; } }

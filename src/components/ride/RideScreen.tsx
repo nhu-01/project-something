@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { MISSION_KEY, useRideEngine } from "./engine";
 import { requestCompass, useCompass } from "./compass";
 import NavOverlay from "./NavOverlay";
+import { useVoiceCommand } from "./voiceCommand";
 import type { PlannedRoute } from "./Destination";
 import { useCamera, useSpeech, useWakeLock } from "./hooks";
 import Recap from "./Recap";
@@ -37,6 +38,7 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
   const [chosenVoice, setChosenVoice] = useState<Voice | null>(null);
   const voice = chosenVoice ?? detectedVoice;
   const [paused, setPaused] = useState(false);
+  const [flash, setFlash] = useState(0);
   const [route, setRoute] = useState<PlannedRoute | null>(null); // 311 spots on the way to the chosen destination
   const startedAt = useRef(0);
   const [summary, setSummary] = useState({ seconds: 0 });
@@ -91,7 +93,14 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
   const onTargetClose = useCallback(() => speech.say(voicePhrase(lang, "spotAhead"), lang), [speech, lang]);
   const onAtSpot = useCallback(() => speech.say(voicePhrase(lang, "atSpot"), lang, true), [speech, lang]);
   const onNext = useCallback((place: string | null) => speech.say(voicePhrase(lang, place ? "next" : "finished"), lang), [speech, lang]);
-  const { pos, gps, online, spots, hazards, stops, target, alert, skip, finished } = useRideEngine({ active: riding, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, demo, demoPhotos });
+  const onSnap = useCallback(() => { setFlash((n) => n + 1); setNotice(t("hud.snapped")); }, [t]);
+  const onNoHazard = useCallback(() => { setNotice(t("hud.noneSeen")); speech.say(voicePhrase(lang, "noneSeen"), lang); }, [speech, lang, t]);
+  const { pos, gps, online, spots, hazards, stops, target, alert, skip, finished, capture, getRide } = useRideEngine({ active: riding, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard, onSnap, demo, demoPhotos });
+
+  // Hands-free backup for when the camera doesn't pick a pothole out by itself: say "take a picture here".
+  const onVoiceCommand = useCallback(() => { capture(); speech.say(voicePhrase(lang, "takingPhoto"), lang, true); }, [capture, speech, lang]);
+  const onMicUnavailable = useCallback(() => setNotice(t("hud.micUnavailable")), [t]);
+  const listening = useVoiceCommand({ on: riding && !demo, getRide, onCommand: onVoiceCommand, onUnavailable: onMicUnavailable, isSpeaking: speech.isSpeaking });
   const compass = useCompass(riding);
 
   // Say so the first time GPS locks on, so the rider knows it's working without looking.
@@ -148,11 +157,12 @@ export default function RideScreen({ demo = false, demoPhotos = [] }: { demo?: b
           {cameraState === "denied" ? t("hud.cameraDenied") : t("hud.cameraStarting")}
         </p>
       )}
+      {flash > 0 && <div key={flash} className="pointer-events-none absolute inset-0 z-10 animate-[snapflash_0.35s_ease-out_forwards] bg-paper" aria-hidden />}
       <div className={`absolute inset-0 transition-colors duration-500 ${riding ? "bg-ink/25" : "bg-ink/45"}`} aria-hidden />
 
       {riding ? (
         <RideHud
-          demo={demo} gps={gps} online={online} last={last} events={events} notice={notice} paused={paused}
+          demo={demo} listening={demo ? null : listening} gps={gps} online={online} last={last} events={events} notice={notice} paused={paused}
           torch={torchSupported ? torchOn : null} onToggleTorch={toggleTorch}
           voiceOn={speech.on} count={events.length} onTogglePause={() => setPaused((p) => !p)} onToggleVoice={() => speech.setOn(!speech.on)} onEnd={end}
         >

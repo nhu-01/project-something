@@ -61,6 +61,7 @@ export default function SafetyIntro({ onStart, demo = false, voice, onVoice, onH
               ))}
               <button type="button" onClick={onHearGuide} className="chip"><Volume />{t("ride.hear")}</button>
             </div>
+            {!demo && <p className="mt-2 text-xs text-muted">{t("ride.micNote")}</p>}
           </fieldset>
         </div>
 
