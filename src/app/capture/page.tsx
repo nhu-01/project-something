@@ -1,7 +1,7 @@
 import RideScreen from "@/components/ride/RideScreen";
 import { getDemoPhotos } from "@/lib/data";
 
-export const metadata = { title: "ride · spotholes" };
+export const metadata = { title: "spot · spotholes" };
 
 export default async function RidePage({ searchParams }: { searchParams: Promise<{ demo?: string }> }) {
   const { demo } = await searchParams;

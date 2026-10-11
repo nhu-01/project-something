@@ -1,7 +1,7 @@
 "use client";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useState, type ReactNode } from "react";
-import { Flashlight, Pause, Volume } from "@/components/ui/Icons";
+import { Camera, Flashlight, Mic, Pause, Volume } from "@/components/ui/Icons";
 import Snapshot from "./Snapshot";
 import { useI18n } from "@/lib/i18n/client";
 import type { Key } from "@/lib/i18n";
@@ -28,11 +28,14 @@ type Props = {
   onToggleTorch: () => void;
   count: number;
   onTogglePause: () => void;
+  onCapture: () => void; // the shutter
+  mic: boolean | null; // listening for "take a picture here"; null when not offered (demo)
+  onToggleMic: () => void;
   onToggleVoice: () => void;
   onEnd: () => void;
 };
 
-export default function RideHud({ demo = false, gps, online, last, events, children, notice, paused, voiceOn, torch, onToggleTorch, count, onTogglePause, onToggleVoice, onEnd }: Props) {
+export default function RideHud({ demo = false, gps, online, last, events, children, notice, paused, voiceOn, torch, onToggleTorch, count, onTogglePause, onToggleVoice, onEnd, onCapture, mic, onToggleMic }: Props) {
   const reduce = useReducedMotion();
   const { t } = useI18n();
   const elapsed = useElapsed(!paused);
@@ -69,6 +72,7 @@ export default function RideHud({ demo = false, gps, online, last, events, child
         <div className="flex items-center gap-2">
           <motion.div key={count} initial={count > 0 && !reduce ? { scale: 1.25 } : false} animate={{ scale: 1 }} transition={{ delay: 1.55, duration: 0.5, ease: [0.16, 1, 0.3, 1] }} className="whitespace-nowrap rounded-full bg-paper/90 px-3 py-2 text-sm text-ink backdrop-blur">{t("hud.logged", { n: count })}</motion.div>
           {torch !== null && <button onClick={onToggleTorch} aria-pressed={torch} aria-label={torch ? t("hud.torchOff") : t("hud.torchOn")} className={`grid h-11 w-11 place-items-center rounded-full backdrop-blur ${torch ? "bg-paper/90 text-ink" : "bg-paper/30 text-paper"}`}><Flashlight /></button>}
+          {mic !== null && <button onClick={onToggleMic} aria-pressed={mic} aria-label={mic ? t("hud.micOff") : t("hud.micOn")} className={`grid h-11 w-11 place-items-center rounded-full backdrop-blur ${mic ? "bg-paper/90 text-ink" : "bg-paper/30 text-paper"}`}><Mic /></button>}
           <button onClick={onToggleVoice} aria-pressed={voiceOn} aria-label={voiceOn ? t("hud.mute") : t("hud.unmute")} className={`grid h-11 w-11 place-items-center rounded-full backdrop-blur ${voiceOn ? "bg-paper/90 text-ink" : "bg-paper/30 text-paper"}`}><Volume /></button>
         </div>
       </div>
@@ -96,6 +100,7 @@ export default function RideHud({ demo = false, gps, online, last, events, child
 
       {/* controls */}
       <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-3 p-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
+        <button onClick={onCapture} aria-label={t("hud.shutter")} className="grid h-16 w-16 shrink-0 place-items-center rounded-full border-4 border-paper bg-taxi text-ink shadow-[0_6px_18px_rgb(0_0_0/0.4)] active:translate-y-0.5"><Camera /></button>
         <button onClick={onTogglePause} className="pill bg-paper/90 text-ink backdrop-blur"><Pause />{paused ? t("hud.resume") : t("hud.pause")}</button>
         <button onClick={onEnd} className="pill bg-paper text-ink">{t("hud.end")}</button>
       </div>

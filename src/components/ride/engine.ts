@@ -8,7 +8,7 @@ type ServerEvent = {
 
 const FRAME_MS = 800; // how often a frame is taken
 const MAX_IN_FLIGHT = 2; // frames being checked at once, so a slow answer doesn't stall the camera
-const NEEDED = 2; // photos from one pass that count as "done" at a 311 spot
+const NEEDED = 1; // one accepted photo finishes the visit to a chosen spot
 const FT = 3.28084;
 const SIM_SPEED = 9; // m/s in the demo: brisk, so the loop takes about a minute
 export const MISSION_KEY = "spotholes-mission"; // stops chosen on the map or from a destination
@@ -71,13 +71,14 @@ type Opts = {
   onAtSpot: (place: string) => void; // arrived at it
   onNext: (place: string | null) => void; // moved on to a new target (null: nothing left)
   onNear: (place: string) => void; // a pothole is close by
+  onNoHazard: () => void; // a photo asked for by hand showed no road pothole
   demoPhotos?: string[]; // real rider frames the demo "captures"
   demo?: boolean; // a scripted ride past real 311 spots: no GPS, no camera, nothing is sent or saved
 };
 
 // Runs a ride: follows the rider's GPS, points to the next 311 spot, and sends camera frames to the server, which adds
 // photos to the 311 report you are standing at (or logs a new hazard anywhere else).
-export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, demo = false, demoPhotos = [] }: Opts) {
+export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard, demo = false, demoPhotos = [] }: Opts) {
   const [pos, setPos] = useState<Pos | null>(null);
   const [gps, setGps] = useState<GpsState>("waiting");
   const [online, setOnline] = useState(true);
@@ -88,14 +89,14 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
   const [target, setTarget] = useState<NavTarget | null>(null);
   const [alert, setAlert] = useState<NearAlert | null>(null);
   const [distanceM, setDistanceM] = useState(0);
-  const [skipTick, setSkipTick] = useState(0);
 
-  const live = useRef({ paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear });
-  useEffect(() => { live.current = { paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear }; }, [paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear]);
+  const live = useRef({ paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard });
+  useEffect(() => { live.current = { paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard }; }, [paused, onResult, onHint, onLuma, onTargetClose, onAtSpot, onNext, onNear, onNoHazard]);
 
   const photosAt = useRef(new Map<string, number>()); // photos this ride added to each 311 spot
-  const doneSet = useRef(new Set<string>()); // spots finished or skipped on this ride
-  const skipRequested = useRef(false);
+  const doneSet = useRef(new Set<string>()); // spots finished on this visit
+  const captureRef = useRef<(() => void) | null>(null); // takes a photo right now
+  const rideRef = useRef<{ rideId: string; token: string } | null>(null);
   const posRef = useRef<Pos | null>(null);
   const targetIdRef = useRef<string | null>(null);
   const targetRef = useRef<Spot | null>(null);
@@ -104,7 +105,8 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
   const spotsRef = useRef<Spot[]>([]); // read by the timer, which must not run inside a state updater
   const hazardsRef = useRef<NearbyHazard[]>([]);
 
-  const skip = useCallback(() => { skipRequested.current = true; setSkipTick((n) => n + 1); }, []);
+  const capture = useCallback(() => captureRef.current?.(), []);
+  const getRide = useCallback(() => rideRef.current, []);
 
   useEffect(() => {
     if (!active) return;
@@ -126,7 +128,7 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
       startingRide = true;
       try {
         const r = await fetch("/api/rides", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ deviceId: deviceId() }) });
-        if (r.ok && !stopped) { ride = await r.json(); setOnline(true); } else if (!r.ok) setOnline(false);
+        if (r.ok && !stopped) { ride = await r.json(); rideRef.current = ride; setOnline(true); } else if (!r.ok) setOnline(false);
       } catch { setOnline(false); }
       startingRide = false;
     };
@@ -146,7 +148,7 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
       });
     };
 
-    const send = async (frame: Blob) => {
+    const send = async (frame: Blob, manual = false) => {
       const p = posRef.current;
       if (!ride || !p) return null;
       const form = new FormData();
@@ -155,14 +157,15 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
       if (p.heading != null) form.append("heading", String(p.heading));
       if (p.accuracy != null) form.append("accuracy", String(p.accuracy));
       form.append("frame", frame, "frame.jpg");
+      if (manual) form.append("manual", "1");
       try {
         const res = await fetch("/api/scan", { method: "POST", body: form });
-        if (res.status === 401) { ride = null; void ensureRide(); return null; } // the server lost this ride: start a fresh one
+        if (res.status === 401) { ride = null; rideRef.current = null; void ensureRide(); return null; } // the server lost this ride: start a fresh one
         setOnline(res.ok);
         if (!res.ok) return null;
-        const body = (await res.json()) as { event: ServerEvent | null; hint?: "screen" };
+        const body = (await res.json()) as { event: ServerEvent | null; hint?: "screen"; reason?: "no_hazard" };
         if (body.hint && !stopped && Date.now() - lastHint > 20000) { lastHint = Date.now(); live.current.onHint(body.hint); }
-        return body.event;
+        return body;
       } catch { setOnline(false); return null; }
     };
 
@@ -192,7 +195,7 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
           const pool = [...body.spots];
           const loop: Spot[] = [];
           let here: { lat: number; lng: number } = c;
-          while (loop.length < 3 && pool.length) {
+          while (loop.length < 1 && pool.length) {
             pool.sort((a, b) => meters(here, a) - meters(here, b));
             const next = pool.shift()!;
             if (loop.some((s) => meters(s, next) < 60)) continue;
@@ -253,21 +256,17 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
 
       // candidates: the chosen route, in order, or else whatever 311 spots are nearby
       {
-        const candidates = missionStops.length ? missionStops : spotsRef.current;
+        // the one spot being photographed: the chosen report (or the demo's); with none chosen there is no target
+        const candidates = demo ? spotsRef.current : missionStops;
         const open = candidates.filter((c) => !doneSet.current.has(c.id));
-        const score = (c: Spot) => meters(p, c) + (c.photos ?? 0) * 400;
-        const pick = missionStops.length ? open[0] : [...open].sort((a, b) => score(a) - score(b))[0];
-
-        if (skipRequested.current && pick) { skipRequested.current = false; doneSet.current.add(pick.id); }
-        let chosen: Spot | undefined = pick;
-        if (chosen && doneSet.current.has(chosen.id)) chosen = missionStops.length ? open.filter((c) => !doneSet.current.has(c.id))[0] : [...open].filter((c) => !doneSet.current.has(c.id)).sort((a, b) => score(a) - score(b))[0];
+        let chosen: Spot | undefined = open[0];
 
         // a spot is finished once this pass has added enough photos to it
         // (and the next open one is picked straight away, so "finished" is only said when nothing is left)
         while (chosen && (photosAt.current.get(chosen.id) ?? 0) >= NEEDED) {
           doneSet.current.add(chosen.id);
           const rest = candidates.filter((c) => !doneSet.current.has(c.id));
-          chosen = missionStops.length ? rest[0] : [...rest].sort((a, b) => score(a) - score(b))[0];
+          chosen = rest[0];
         }
         targetRef.current = chosen ?? null;
         setFinished(!chosen && doneSet.current.size > 0);
@@ -311,13 +310,32 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
       inFlight++;
       try {
         const { blob, luma, aspect } = await grabFrame(video, canvas, tiny);
-        if (blob) { const f = { blob, aspect }; live.current.onLuma(luma); emit(await send(blob), f); }
+        if (blob) { const f = { blob, aspect }; live.current.onLuma(luma); emit((await send(blob))?.event, f); }
       } finally { inFlight--; }
     }, FRAME_MS);
+
+    // a photo on request (the shutter button, or "take a picture here"): sent right away, ignoring the pacing rules
+    captureRef.current = async () => {
+      if (stopped || live.current.paused) return;
+      if (demo) {
+        const tg = targetRef.current;
+        if (tg) emit({ kind: "photo", source: "311", potholeId: tg.id, hazard: "pothole", street: tg.place, lane: "right lane", severity: 3 }, null, photosRef.current[0]);
+        return;
+      }
+      const video = videoRef.current;
+      if (!video || !ride || !posRef.current) { live.current.onNoHazard(); return; }
+      const { blob, luma, aspect } = await grabFrame(video, canvas, tiny);
+      if (!blob) return;
+      live.current.onLuma(luma);
+      const r = await send(blob, true);
+      if (r?.event) emit(r.event, { blob, aspect });
+      else if (r?.reason === "no_hazard") live.current.onNoHazard();
+    };
 
     return () => {
       stopped = true;
       clearInterval(tick);
+      captureRef.current = null;
       if (frameTimer) clearInterval(frameTimer);
       if (rideTimer) clearInterval(rideTimer);
       if (simTimer) clearInterval(simTimer);
@@ -329,5 +347,5 @@ export function useRideEngine({ active, paused, videoRef, onResult, onHint, onLu
     };
   }, [active, videoRef, demo]);
 
-  return { pos, gps, online, spots, hazards, stops, target, alert, distanceM, skip, skipTick, finished };
+  return { pos, gps, online, spots, hazards, stops, target, alert, distanceM, finished, capture, getRide };
 }

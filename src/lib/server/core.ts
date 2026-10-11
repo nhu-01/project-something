@@ -29,7 +29,7 @@ const RIDEABLE = new Set(["street", "sidewalk_or_path"]);
 // off for indoor testing only.
 const allowScreens = () => process.env.ALLOW_SCREEN_FRAMES === "1";
 const isPicture = (v: Verdict) => v.screen_or_print && !allowScreens();
-export type ScanResult = { event: RideEventOut | null; hint?: "screen" };
+export type ScanResult = { event: RideEventOut | null; hint?: "screen"; reason?: "no_hazard" };
 
 export type Position = { lat: number; lng: number; heading: number | null; accuracy: number | null };
 // source "311" events are photos added to a city report (id is the 311 number); "rider" events are hazards riders logged.
@@ -106,12 +106,13 @@ async function resight(ride: Ride, p: Known, v: Verdict, pos: Position, frame: B
 
 // A frame taken at a 311 report: the photo joins that report's gallery (many riders, many photos, like Austin and
 // Boston), and the report's latest read of the spot is refreshed.
-async function cityFrame(ride: Ride, report: { id: string; place: string }, frame: Buffer, pos: Position, yolo: number): Promise<ScanResult> {
+async function cityFrame(ride: Ride, report: { id: string; place: string }, frame: Buffer, pos: Position, yolo: number, manual: boolean): Promise<ScanResult> {
   const [stat] = await query<{ n: number; last: string | Date | null; missed: number }>(
     "SELECT COUNT(*)::int AS n, MAX(at) AS last, COUNT(*) FILTER (WHERE NOT present)::int AS missed FROM city_photos WHERE report_id=$1 AND ride_id=$2", [report.id, ride.id]);
-  if (stat.n >= MAX_PHOTOS_PER_RIDE_SPOT) return { event: null };
-  if (stat.last && Date.now() - new Date(stat.last).getTime() < MIN_GAP_S * 1000) return { event: null };
-  if (yolo < KNOWN_HIT && !(await dueForLook(ride.id))) return { event: null };
+  // a photo someone asked for by tapping or speaking skips the pacing rules; the judge still has the last word
+  if (!manual && stat.n >= MAX_PHOTOS_PER_RIDE_SPOT) return { event: null };
+  if (!manual && stat.last && Date.now() - new Date(stat.last).getTime() < MIN_GAP_S * 1000) return { event: null };
+  if (!manual && yolo < KNOWN_HIT && !(await dueForLook(ride.id))) return { event: null };
 
   const v = await judge(ride, frame);
   if (isPicture(v)) return { event: null, hint: "screen" };
@@ -124,6 +125,7 @@ async function cityFrame(ride: Ride, report: { id: string; place: string }, fram
     return { event: { ...base, kind: "photo", hazard: hazardOf(v), lane: v.lane, severity: v.severity, photoNumber: now?.photo_count } };
   }
   // Nothing visible: recorded at most once per ride, and only when the model is fairly sure.
+  if (manual) return { event: null, reason: "no_hazard" };
   if (v.confidence === "low" || stat.missed > 0) return { event: null };
   const photo = await photoFor(`${ride.id}-c${report.id}-none.jpg`, frame, v);
   await addCityPhoto({ reportId: report.id, rideId: ride.id, rider: ride.rider, photo, present: false, severity: null, note: v.note, lat: pos.lat, lng: pos.lng });
@@ -131,19 +133,19 @@ async function cityFrame(ride: Ride, report: { id: string; place: string }, fram
 }
 
 // Called for each camera frame during a ride.
-export async function scanFrame(ride: Ride, frame: Buffer, pos: Position): Promise<ScanResult> {
+export async function scanFrame(ride: Ride, frame: Buffer, pos: Position, manual = false): Promise<ScanResult> {
   const yolo = await detect(ride, frame);
   if (!validPoint(pos.lat, pos.lng) || (pos.accuracy != null && pos.accuracy > 65)) return { event: null };
 
   // At a 311 spot: the photo goes on that report.
   const city = (await cityReportsNear(pos.lat, pos.lng, cityRadius(pos)))[0];
-  if (city) return cityFrame(ride, city, frame, pos, yolo);
+  if (city) return cityFrame(ride, city, frame, pos, yolo, manual);
 
   const near = (await nearbyOpen(pos.lat, pos.lng, joinRadius(pos))).sort((x, y) => meters(pos.lat, pos.lng, x.lat, x.lng) - meters(pos.lat, pos.lng, y.lat, y.lng))[0];
 
   if (near) {
     if (await alreadySeen(ride.id, near.id)) return { event: null };
-    if (yolo < KNOWN_HIT && !(await dueForLook(ride.id))) return { event: null };
+    if (!manual && yolo < KNOWN_HIT && !(await dueForLook(ride.id))) return { event: null };
     const v = await judge(ride, frame);
     if (isPicture(v)) return { event: null, hint: "screen" };
     if (v.pothole_present) return { event: await resight(ride, near, v, pos, frame, yolo) };
@@ -157,10 +159,10 @@ export async function scanFrame(ride: Ride, frame: Buffer, pos: Position): Promi
     return { event: null };
   }
 
-  if (yolo < NEW_HIT && !(await dueForLook(ride.id))) return { event: null };
+  if (!manual && yolo < NEW_HIT && !(await dueForLook(ride.id))) return { event: null };
   const v = await judge(ride, frame);
   if (isPicture(v)) return { event: null, hint: v.pothole_present ? "screen" : undefined };
-  if (!v.pothole_present || !RIDEABLE.has(v.road_type) || v.confidence === "low" || (v.severity ?? 2) < MIN_NEW_SEVERITY) return { event: null };
+  if (!v.pothole_present || !RIDEABLE.has(v.road_type) || v.confidence === "low" || (v.severity ?? 2) < MIN_NEW_SEVERITY) return { event: null, reason: manual ? "no_hazard" : undefined };
   // At speed, the same hazard shows up in back-to-back frames taken more than JOIN_RADIUS_M apart. Don't log it twice.
   if (await justLogged(ride.id)) return { event: null };
 

@@ -3,10 +3,10 @@ import { AnimatePresence } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Locate, Search } from "@/components/ui/Icons";
-import type { CityReport, Mission, Pothole } from "@/lib/data/types";
+import type { CityReport, Pothole } from "@/lib/data/types";
 import { useI18n } from "@/lib/i18n/client";
 import type { Key } from "@/lib/i18n";
-import { CitySheet, MissionSheet } from "./CityPanels";
+import { CitySheet } from "./CityPanels";
 import DetailSheet from "./DetailSheet";
 import MapClient from "./MapClient";
 import type { Me, PinLabels, Selection } from "./MapView";
@@ -33,7 +33,6 @@ export default function MapExplorer({ potholes, city }: { potholes: Pothole[]; c
   const [showCityNone, setShowCityNone] = useState(true);
   const [showCityPhoto, setShowCityPhoto] = useState(true);
   const [selected, setSelected] = useState<Selection>(null);
-  const [mission, setMission] = useState<Mission | null>(null);
   const [planning, setPlanning] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [me, setMe] = useState<Me | null>(null);
@@ -65,28 +64,24 @@ export default function MapExplorer({ potholes, city }: { potholes: Pothole[]; c
   const riderSel = selected?.type === "rider" ? visibleRider.find((p) => p.id === selected.id) ?? null : null;
   const citySel = selected?.type === "city" ? visibleCity.find((r) => r.id === selected.id) ?? null : null;
   const clearSelection = useCallback(() => setSelected(null), []);
-  const pick = useCallback((s: NonNullable<Selection>) => { setMission(null); setSelected(s); }, []);
+  const pick = useCallback((s: NonNullable<Selection>) => { setSelected(s); }, []);
 
   const goToSpot = (r: CityReport) => {
     try { sessionStorage.setItem(MISSION_KEY, JSON.stringify(stopsOf([r]))); } catch { /* storage blocked */ }
-    router.push("/ride");
-  };
-  const startMission = () => {
-    if (!mission) return;
-    try { sessionStorage.setItem(MISSION_KEY, JSON.stringify(stopsOf(mission.stops))); } catch { /* storage blocked */ }
-    router.push("/ride");
+    router.push("/capture");
   };
 
-  // Ask where the visitor is, then fetch a short route past nearby 311 spots, fewest photos first.
-  const plan = () => {
+  // Ask where the visitor is, then go to the one nearest 311 spot that still needs a photo.
+  const goNearest = () => {
     setPlanning(true); setNote(null);
     if (!navigator.geolocation) { setPlanning(false); setNote(t("map.noLocationSupport")); return; }
     navigator.geolocation.getCurrentPosition(async (p) => {
       try {
-        const res = await fetch(`/api/mission?lat=${p.coords.latitude}&lng=${p.coords.longitude}`);
-        const m = (await res.json()) as Mission;
-        if (!res.ok || !m.stops?.length) { setNote(t("map.noneNear")); return; }
-        setMission(m); setSelected(null);
+        const res = await fetch(`/api/nearest?lat=${p.coords.latitude}&lng=${p.coords.longitude}`);
+        const { spot } = (await res.json()) as { spot: { id: string; lat: number; lng: number; place: string } | null };
+        if (!res.ok || !spot) { setNote(t("map.noneNear")); return; }
+        try { sessionStorage.setItem(MISSION_KEY, JSON.stringify([spot])); } catch { /* storage blocked */ }
+        router.push("/capture");
       } catch { setNote(t("map.routeFailed")); }
       finally { setPlanning(false); }
     }, () => { setPlanning(false); setNote(t("map.locationOff")); }, { enableHighAccuracy: true, timeout: 12000 });
@@ -95,7 +90,7 @@ export default function MapExplorer({ potholes, city }: { potholes: Pothole[]; c
   const nothing = potholes.length === 0 && city.length === 0;
   return (
     <div className="map-shell relative h-[calc(100dvh-64px)] w-full">
-      <MapClient labels={labels} potholes={visibleRider} city={visibleCity} selected={selected} onSelect={pick} mission={mission} me={me} centerOnMe={centerOnMe} />
+      <MapClient labels={labels} potholes={visibleRider} city={visibleCity} selected={selected} onSelect={pick} me={me} centerOnMe={centerOnMe} />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[1000] flex flex-col gap-3 p-3 sm:p-4 md:max-w-[calc(100%-420px)]">
         <label className="pointer-events-auto flex h-12 max-w-md items-center gap-3 rounded-full border border-line bg-card/95 px-4 shadow-[0_6px_24px_rgb(32_33_30/0.08)] backdrop-blur">
@@ -127,17 +122,16 @@ export default function MapExplorer({ potholes, city }: { potholes: Pothole[]; c
         <span className="text-muted">{nothing ? t("map.none") : t("map.shown", { n: visibleRider.length + visibleCity.length })}</span>
       </div>
 
-      {!selected && !mission && city.length > 0 && (
+      {!selected && city.length > 0 && (
         <div className="pointer-events-none absolute inset-x-0 bottom-16 z-[1000] flex flex-col items-center gap-2 px-3 sm:bottom-6">
           {note && <p className="pointer-events-auto max-w-sm rounded-full border border-line bg-card/95 px-4 py-2 text-center text-sm backdrop-blur" role="status">{note}</p>}
-          <button onClick={plan} disabled={planning} className="pill pill-ink pointer-events-auto shadow-[0_10px_30px_rgb(32_33_30/0.25)] disabled:opacity-70">{planning ? t("map.finding") : t("map.routeNear")}</button>
+          <button onClick={goNearest} disabled={planning} className="pill pill-ink pointer-events-auto shadow-[0_10px_30px_rgb(32_33_30/0.25)] disabled:opacity-70">{planning ? t("map.finding") : t("map.routeNear")}</button>
         </div>
       )}
 
       <AnimatePresence>
         {riderSel && <DetailSheet key={`r${riderSel.id}`} pothole={riderSel} onClose={clearSelection} />}
-        {citySel && <CitySheet key={`c${citySel.id}`} report={citySel} onClose={clearSelection} onGo={() => goToSpot(citySel)} onPlan={plan} planning={planning} />}
-        {mission && <MissionSheet key="mission" mission={mission} onClose={() => setMission(null)} onStart={startMission} />}
+        {citySel && <CitySheet key={`c${citySel.id}`} report={citySel} onClose={clearSelection} onGo={() => goToSpot(citySel)} onPlan={goNearest} planning={planning} />}
       </AnimatePresence>
     </div>
   );

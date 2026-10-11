@@ -2,25 +2,27 @@
 
 **spot a pothole. snap it.** A photo record of New York City's reported potholes.
 
-New York has thousands of pothole reports filed through 311, and almost none of them have a picture. spotholes lets a
-volunteer find the nearest reported pothole (or a route past several), film it as they ride past, and add the picture
-to that report. Each 311 report becomes a page that collects photos from many riders over time, like the public
-ticket pages in Austin and Boston. Everyone else follows along on a map.
+New York has thousands of pothole reports filed through 311, and almost none of them have a picture. spotholes takes a
+volunteer to **one** reported pothole with turn-by-turn directions, where they film it or snap a photo and submit it.
+Each 311 report becomes a page that collects photos from many people over time, like the public ticket pages in Austin
+and Boston. Everyone else follows along on a map.
 
 Live at **spotholes.nyc**. Built for MLH Hack Knight 2026. An independent project, not affiliated with the City of New York.
 
 ## What it does
 
-- **Spot a pothole:** one button, three options: start a video, route to the nearest reported potholes, or watch a
-  simulated demo ride (nothing is saved).
-- **Ride screen:** a see-through navigation overlay with a Find My style arrow, distance, live mini-map, and a
-  "pothole near you" arrow. A phone camera feed is checked frame by frame; real road potholes are added to the
-  311 report you are standing at.
-- **Road only:** an AI judge rejects sidewalks, pavers, plazas, screens and prints. Frames showing faces or license
+- **Spot a pothole:** one button, three options: start a video anywhere, go to the nearest reported pothole, or watch a
+  simulated demo (nothing is saved).
+- **One spot, one visit:** the nearest open 311 report that needs a photo, with turn-by-turn directions
+  ([Leaflet Routing Machine](https://www.liedman.net/leaflet-routing-machine/) over OpenStreetMap bike routing), a
+  see-through direction arrow and a live mini-map. When the photo is accepted, you're done.
+- **Take the photo hands-free:** the camera checks frames on its own, there is a shutter button, or say
+  "take a picture here" (ElevenLabs speech-to-text).
+- **Roads only:** an AI judge rejects sidewalks, pavers, plazas, screens and prints. Frames showing faces or license
   plates are never stored.
-- **Letter grades:** severity is shown as A (minor) to E (severe), like a restaurant sign.
-- **Map:** 311 reports are rounded squares, other finds are circles, and you are the blue dot. Cycling map style.
-- **Spot pages:** every 311 report has a gallery of rider photos plus street-level photos from Mapillary.
+- **Letter grades:** severity is shown as A (minor) to E (severe), like the NYC Department of Health letter grades.
+- **Map:** 311 reports are rounded squares, other finds are circles, and you are the blue dot.
+- **Spot pages:** every 311 report has a gallery of volunteer photos plus street-level photos from Mapillary.
 - **Voice:** spoken cues in ten languages (ElevenLabs, with the browser voice as a fallback).
 - **Ten languages**, with Arabic right-to-left. The language is chosen on first visit.
 
@@ -30,15 +32,15 @@ Live at **spotholes.nyc**. Built for MLH Hack Knight 2026. An independent projec
 |---|---|
 | App | Next.js 16 (App Router), React 19, TypeScript (strict) |
 | Styling | Tailwind CSS v4, design tokens in `globals.css`, `motion` for animation |
-| Map | Leaflet + leaflet.markercluster, CyclOSM tiles (free, no key) |
+| Map and directions | Leaflet + leaflet.markercluster, CyclOSM tiles, Leaflet Routing Machine (OSRM bike profile); no keys |
 | Database | Tiger Data (TimescaleDB / Postgres), `pg`; PGlite embedded for local dev |
 | Photos | Vercel Blob (local files in dev) |
 | Detection, first pass | YOLOv8s ONNX model run server-side with `onnxruntime-web` (WASM) |
 | Detection, judge | Google Gemini (`@google/genai`), structured JSON verdicts validated with Zod |
-| Voice | ElevenLabs text-to-speech, cached in Blob, only for fixed catalog phrases |
+| Voice | ElevenLabs text-to-speech (cached, fixed catalog phrases only) and speech-to-text for "take a picture here" |
 | Street-level photos | Mapillary API (CC BY-SA 4.0) |
 | City data | NYC Open Data, 311 service requests (`erm2-nwe9`), synced daily |
-| Geocoding and routing | NYC geocoder, OpenStreetMap Nominatim, OSRM bike routing |
+| Geocoding | NYC geocoder, OpenStreetMap Nominatim |
 | Hosting | Vercel (manual deploys), Vercel Cron for the daily 311 sync |
 
 ## How it was built
@@ -46,27 +48,29 @@ Live at **spotholes.nyc**. Built for MLH Hack Knight 2026. An independent projec
 Built in roughly 40 hours with [Claude Code](https://claude.com/claude-code) as a pair programmer.
 
 1. **311 first.** The 311 open-data feed is imported (reports with coordinates, minus expressways, ramps and bridges
-   a cyclist should not be filming). Every report is a place where photos can be added.
-2. **A ride is a stream of frames.** The browser takes a frame about every 800 ms while the GPS watch runs. Frames go to
-   `/api/scan`, signed with a short-lived ride token. At most two are in flight at once.
+   nobody should be filming). Every report is a place where photos can be added.
+2. **A visit is a stream of frames.** The browser takes a frame about every 800 ms while the GPS watch runs. Frames go
+   to `/api/scan`, signed with a short-lived token. At most two are in flight at once. A shutter tap or a spoken
+   command sends one immediately and skips the pacing rules.
 3. **Cheap first, smart second.** The YOLO model filters frames on the server; only frames that look promising go to
    Gemini, which returns hazard type, grade, size, lane, road type, and whether the camera is pointed at a screen.
 4. **Place matching.** A frame near an open 311 report becomes a photo on that report. Elsewhere it joins an existing
-   rider-found hazard or creates one, with a radius that grows with GPS error so one pothole is not logged twice.
-5. **Navigation without a nav SDK.** The arrow is bearing math on GPS plus the phone compass; the mini-map is a second
-   small Leaflet instance.
+   volunteer-found hazard or creates one, with a radius that grows with GPS error so one pothole is not logged twice.
+5. **Directions.** `/api/nearest` picks the spot; the browser asks the OSRM bike router for steps through Leaflet
+   Routing Machine, follows the GPS fix along the line, and re-routes if you drift more than about 70 m away. The arrow
+   is bearing math on GPS plus the phone compass.
 6. **Everything said aloud lives in the translation catalog.** One English file, nine generated dictionaries
    (`scripts/translate.mjs`, placeholder-checked and resumable). The voice endpoint only synthesizes catalog phrases,
-   so it can't be used to speak arbitrary text.
-7. **Privacy by design.** Frames with identifiable people or plates are dropped; riders are anonymous labels; there is
-   no ridden-streets trace and no account system.
+   so it can't be used to speak arbitrary text. The microphone is opt-in; short clips are transcribed and not stored.
+7. **Privacy by design.** Frames with identifiable people or plates are dropped; people are anonymous labels; there is
+   no location trail and no account system.
 
 ## Project layout
 
 ```
-src/app/            pages (home, map, ride, spots/[id], potholes/[id]) and API routes
-src/components/     landing, map, ride (engine, HUD, overlay), photos, ui
-src/lib/server/     database, detection, Gemini judge, 311 sync, routing, Mapillary, storage
+src/app/            pages (home, map, capture, spots/[id], potholes/[id]) and API routes
+src/components/     landing, map, ride (camera screen: engine, navigation, HUD, overlay), photos, ui
+src/lib/server/     database, detection, Gemini judge, 311 sync, Mapillary, storage
 src/lib/data/       the only way pages read data (server-only)
 src/lib/i18n/       en.ts catalog and generated dictionaries
 models/             the YOLO ONNX model
@@ -89,7 +93,7 @@ Environment variables (see `.env.example`):
 | `USE_LOCAL_DB` | `1` to use the embedded database and local photo files |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob photo storage |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | the frame judge and translations |
-| `ELEVENLABS_API_KEY` | voice |
+| `ELEVENLABS_API_KEY` | voice cues and voice commands |
 | `MAPILLARY_TOKEN` | street-level photos (optional; hidden without it) |
 | `ADMIN_KEY`, `CRON_SECRET` | the 311 sync endpoint and maintenance |
 

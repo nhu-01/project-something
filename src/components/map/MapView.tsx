@@ -4,7 +4,7 @@ import "leaflet.markercluster";
 import { useEffect, useRef } from "react";
 import { escapeHtml } from "@/lib/escape";
 import { gradeOf } from "@/lib/tokens";
-import type { CityReport, Mission, Pothole } from "@/lib/data/types";
+import type { CityReport, Pothole } from "@/lib/data/types";
 
 // Text for the pins' screen-reader labels, supplied by the page in the visitor's language.
 export type PinLabels = { hazard: Record<string, string>; sev: Record<number, string>; repaired: string; city: string; cityPhotos: string; me: string };
@@ -17,7 +17,6 @@ type Props = {
   city: CityReport[];
   selected: Selection;
   onSelect: (s: NonNullable<Selection>) => void;
-  mission: Mission | null;
   me: Me | null;
   centerOnMe: number; // bump to fly the map to the visitor
 };
@@ -48,12 +47,11 @@ function cityIcon(r: CityReport, selected: boolean, labels: PinLabels) {
 
 const meIcon = () => L.divIcon({ className: "pin-wrap", html: '<span class="me-dot" aria-hidden="true"><span class="me-pulse"></span><span class="me-core"></span></span>', iconSize: [28, 28], iconAnchor: [14, 14] });
 
-export default function MapView({ labels, potholes, city, selected, onSelect, mission, me, centerOnMe }: Props) {
+export default function MapView({ labels, potholes, city, selected, onSelect, me, centerOnMe }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const riderGroup = useRef<L.MarkerClusterGroup | null>(null);
   const cityGroup = useRef<L.MarkerClusterGroup | null>(null);
-  const missionLayer = useRef<L.LayerGroup | null>(null);
   const meLayer = useRef<{ dot: L.Marker; ring: L.Circle } | null>(null);
   const riderMarkers = useRef(new Map<string, { marker: L.Marker; data: Pothole }>());
   const cityMarkers = useRef(new Map<string, { marker: L.Marker; data: CityReport }>());
@@ -83,7 +81,6 @@ export default function MapView({ labels, potholes, city, selected, onSelect, mi
     });
     m.addLayer(cityGroup.current);
     m.addLayer(riderGroup.current);
-    missionLayer.current = L.layerGroup().addTo(m);
     // wheel zoom only after the map is clicked or focused, so the page never gets trapped
     m.on("click focus", () => m.scrollWheelZoom.enable());
     el.addEventListener("mouseleave", () => m.scrollWheelZoom.disable());
@@ -140,18 +137,6 @@ export default function MapView({ labels, potholes, city, selected, onSelect, mi
     }
     prevSel.current = selected;
   }, [selected, labels, potholes, city]);
-
-  // the suggested photo route: a dashed line through numbered stops
-  useEffect(() => {
-    const layer = missionLayer.current, m = map.current;
-    if (!layer || !m) return;
-    layer.clearLayers();
-    if (!mission || !mission.stops.length) return;
-    const ink = getComputedStyle(document.documentElement).getPropertyValue("--ink").trim() || "#20211e";
-    L.polyline(mission.line, { color: ink, weight: 4, opacity: 0.85, dashArray: "2 9", lineCap: "round", interactive: false }).addTo(layer);
-    mission.stops.forEach((s, i) => L.marker([s.lat, s.lng], { interactive: false, keyboard: false, zIndexOffset: 1000, icon: L.divIcon({ className: "pin-wrap", html: `<span class="stop" aria-hidden="true">${i + 1}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(layer));
-    m.fitBounds(L.latLngBounds(mission.line as L.LatLngTuple[]), { padding: [70, 70], maxZoom: 16 });
-  }, [mission]);
 
   // the visitor's own location
   useEffect(() => {

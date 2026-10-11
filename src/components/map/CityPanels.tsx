@@ -6,8 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import CityGallery from "@/components/photos/CityGallery";
 import { ArrowUpRight, Close } from "@/components/ui/Icons";
 import { SeverityMeter } from "@/components/ui/Severity";
-import type { CityReport, CityReportDetail, Mission } from "@/lib/data/types";
-import { ago, daysAgo, distance } from "@/lib/format";
+import type { CityReport, CityReportDetail } from "@/lib/data/types";
+import { ago, daysAgo } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/client";
 import { plural, type Key } from "@/lib/i18n";
 
@@ -86,25 +86,3 @@ export function CitySheet({ report, onClose, onGo, onPlan, planning }: { report:
 }
 
 // The suggested route: a handful of nearby 311 spots to photograph, in riding order.
-export function MissionSheet({ mission, onClose, onStart }: { mission: Mission; onClose: () => void; onStart: () => void }) {
-  const { t, lang } = useI18n();
-  return (
-    <Shell label={t("mission.eyebrow")} onClose={onClose}>
-      <div className="p-5">
-        <p className="eyebrow">{t("mission.eyebrow")}</p>
-        <h2 className="mt-1 pe-10 text-xl font-medium tracking-tight">{plural(t, "mission.title", mission.stops.length, { distance: distance(mission.distanceM) })}</h2>
-        <p className="text-sm text-muted">{mission.routed ? t("mission.routed") : t("mission.straight")}</p>
-        <ol className="mt-4 divide-y divide-line">
-          {mission.stops.map((s, i) => (
-            <li key={s.id} className="flex items-center gap-3 py-2.5">
-              <span className="stop shrink-0" aria-hidden>{i + 1}</span>
-              <span className="min-w-0"><span className="block truncate font-medium">{s.place}</span><span className="block text-sm text-muted">{t("mission.stopMeta", { borough: s.borough, when: ago(s.createdAt, lang) })} · {plural(t, "mission.photos", s.photoCount)}</span></span>
-            </li>
-          ))}
-        </ol>
-        <button onClick={onStart} className="pill pill-ink mt-5 w-full">{t("mission.start")} <ArrowUpRight /></button>
-        <p className="mt-3 text-xs text-muted">{t("mission.note")}</p>
-      </div>
-    </Shell>
-  );
-}

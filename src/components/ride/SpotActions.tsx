@@ -12,7 +12,7 @@ const keep = (stops: Stop[]) => { try { if (stops.length) sessionStorage.setItem
 // Goes straight to the camera with one 311 spot as the target.
 export function PhotographSpot({ spot, className, children }: { spot: Stop; className?: string; children: ReactNode }) {
   const router = useRouter();
-  return <button type="button" className={className} onClick={() => { keep([spot]); router.push("/ride"); }}>{children}</button>;
+  return <button type="button" className={className} onClick={() => { keep([spot]); router.push("/capture"); }}>{children}</button>;
 }
 
 // The "spot a pothole" button. It asks how: just film (open camera, ride), or route to the nearest reported
@@ -34,18 +34,18 @@ export function SpotButton({ className, children }: { className?: string; childr
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const video = () => { keep([]); router.push("/ride"); };
-  const demo = () => { keep([]); router.push("/ride?demo=1"); };
+  const video = () => { keep([]); router.push("/capture"); };
+  const demo = () => { keep([]); router.push("/capture?demo=1"); };
   const route = () => {
     setBusy(true); setNote(null);
     if (!navigator.geolocation) { setBusy(false); setNote(t("map.noLocationSupport")); return; }
     navigator.geolocation.getCurrentPosition(async (p) => {
       try {
-        const res = await fetch(`/api/mission?lat=${p.coords.latitude}&lng=${p.coords.longitude}`);
-        const m = (await res.json()) as { stops?: Stop[] };
-        if (!res.ok || !m.stops?.length) { setNote(t("map.noneNear")); return; }
-        keep(m.stops.map(({ id, lat, lng, place }) => ({ id, lat, lng, place })));
-        router.push("/ride");
+        const res = await fetch(`/api/nearest?lat=${p.coords.latitude}&lng=${p.coords.longitude}`);
+        const { spot } = (await res.json()) as { spot?: Stop | null };
+        if (!res.ok || !spot) { setNote(t("map.noneNear")); return; }
+        keep([{ id: spot.id, lat: spot.lat, lng: spot.lng, place: spot.place }]);
+        router.push("/capture");
       } catch { setNote(t("map.routeFailed")); }
       finally { setBusy(false); }
     }, () => { setBusy(false); setNote(t("map.locationOff")); }, { enableHighAccuracy: true, timeout: 12000 });
