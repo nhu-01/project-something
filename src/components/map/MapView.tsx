@@ -59,6 +59,7 @@ export default function MapView({ labels, potholes, city, selected, onSelect, mi
   const cityMarkers = useRef(new Map<string, { marker: L.Marker; data: CityReport }>());
   const onSelectRef = useRef(onSelect);
   const fitted = useRef(false);
+  const autoZoomed = useRef(false);
   const prevSel = useRef<Selection>(null);
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
 
@@ -171,6 +172,19 @@ export default function MapView({ labels, potholes, city, selected, onSelect, mi
   }, [me, labels.me]);
 
   const lastCenter = useRef(0);
+  // The first time we know where you are: zoom to you and the closest few 311 spots, so what is near you is what you see.
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !me || autoZoomed.current) return;
+    autoZoomed.current = true;
+    const close = city
+      .map((r) => ({ r, d: Math.hypot((r.lat - me.lat) * 111320, (r.lng - me.lng) * 111320 * Math.cos((me.lat * Math.PI) / 180)) }))
+      .filter((x) => x.d < 1500).sort((a, b) => a.d - b.d).slice(0, 4);
+    const pts: L.LatLngTuple[] = [[me.lat, me.lng], ...close.map((x) => [x.r.lat, x.r.lng] as L.LatLngTuple)];
+    if (pts.length > 1) m.fitBounds(L.latLngBounds(pts), { padding: [70, 70], maxZoom: 17, animate: true });
+    else m.setView([me.lat, me.lng], 16, { animate: true });
+  }, [me, city]);
+
   useEffect(() => {
     if (centerOnMe === lastCenter.current) return;
     lastCenter.current = centerOnMe;

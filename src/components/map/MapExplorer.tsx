@@ -50,7 +50,10 @@ export default function MapExplorer({ potholes, city }: { potholes: Pothole[]; c
   useEffect(() => {
     let stop = () => {};
     let alive = true;
-    navigator.permissions?.query({ name: "geolocation" as PermissionName }).then((p) => { if (alive && p.state === "granted") stop = watch(); }).catch(() => {});
+    // the map is for finding potholes near you, so it asks for your location straight away (unless you already said no)
+    const begin = () => { if (alive) stop = watch(); };
+    if (!navigator.permissions) begin();
+    else navigator.permissions.query({ name: "geolocation" as PermissionName }).then((p) => { if (p.state !== "denied") begin(); }).catch(begin);
     return () => { alive = false; stop(); };
   }, [watch]);
   const locate = () => { if (!me) watch(); setCenterOnMe((n) => n + 1); };
