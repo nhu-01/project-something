@@ -163,14 +163,12 @@ export function MapScene() {
   );
 }
 
-// The phone the scenes are drawn in (shared by the homepage walkthrough and the end of the demo ride).
+// The phone the scenes are drawn in (used by the homepage walkthrough).
 export function PhoneFrame({ label, children }: { label: string; children: React.ReactNode }) {
-  const { t } = useI18n();
   return (
     <div className="relative aspect-[9/18.5] w-[270px] overflow-hidden rounded-[40px] border-[7px] border-ink bg-ink shadow-[0_24px_60px_rgb(32_33_30/0.25)]" role="img" aria-label={label}>
       {children}
       <span className="absolute left-1/2 top-2 h-4 w-16 -translate-x-1/2 rounded-full bg-ink" aria-hidden />
-      <span className="absolute end-3 top-2.5 rounded-full bg-taxi px-2 py-0.5 text-[9px] font-semibold text-ink" aria-hidden>{t("demo.tag")}</span>
     </div>
   );
 }
