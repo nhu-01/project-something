@@ -18,7 +18,8 @@ const REASONS = new Set(["no_hazard", "picture", "not_rideable"]);
 
 // Shrinks the photo (and turns HEIC and friends into JPEG) before upload.
 async function resize(file: File, size: number): Promise<Blob> {
-  const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+  // older Safari ignores or rejects the options object, so fall back to the plain call
+  const bmp = await createImageBitmap(file, { imageOrientation: "from-image" }).catch(() => createImageBitmap(file));
   const scale = Math.min(size / bmp.width, size / bmp.height, 1);
   const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
   const canvas = document.createElement("canvas");
@@ -31,12 +32,15 @@ async function resize(file: File, size: number): Promise<Blob> {
 }
 
 // Three still frames from a video (20%, 50%, 80% in), so a clip can be submitted as one photo.
+// iPhones (HEVC .mov) only decode a video once it has played, so it is started muted and paused straight away, and the
+// whole thing gives up after 10 s instead of hanging.
 async function frames(file: File): Promise<File[]> {
   const url = URL.createObjectURL(file);
   const video = document.createElement("video");
   video.muted = true; video.playsInline = true; video.preload = "auto"; video.src = url;
-  try {
+  const work = (async () => {
     await new Promise<void>((res, rej) => { video.onloadedmetadata = () => res(); video.onerror = () => rej(new Error("video")); });
+    try { await video.play(); video.pause(); } catch { /* not allowed: seeking may still work */ }
     const out: File[] = [];
     for (const at of [0.2, 0.5, 0.8]) {
       await new Promise<void>((res) => { video.onseeked = () => res(); video.currentTime = Math.max(0, (video.duration || 1) * at); });
@@ -47,7 +51,11 @@ async function frames(file: File): Promise<File[]> {
       const blob = await new Promise<Blob | null>((res) => c.toBlob(res, "image/jpeg", 0.85));
       if (blob) out.push(new File([blob], `frame-${at}.jpg`, { type: "image/jpeg" }));
     }
+    if (!out.length) throw new Error("no frames");
     return out;
+  })();
+  try {
+    return await Promise.race([work, new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 10000))]);
   } finally { URL.revokeObjectURL(url); }
 }
 
@@ -104,7 +112,7 @@ export default function SubmitForm() {
     setOutcome(null); setError(null); setChoices([]);
     if (chosen.type.startsWith("video/")) {
       try { const got = await frames(chosen); setChoices(got); setFile(got[1] ?? got[0] ?? null); }
-      catch { setError(t("report.failed")); }
+      catch { setError(t("report.videoFailed")); }
       return;
     }
     setFile(chosen);

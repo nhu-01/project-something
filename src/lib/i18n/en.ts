@@ -372,6 +372,7 @@ export const en = {
   "report.seeIt": "see it",
   "report.another": "submit another",
   "report.to311": "your photo was added to the 311 report at {place}.",
+  "report.videoFailed": "couldn't read that video. try a photo, or a different clip.",
   "voice.start": "Ride started. Follow the arrow to the nearest 311 spot.",
   "voice.gps": "Location found.",
   "voice.done": "Ride complete. Thanks for adding photos.",
