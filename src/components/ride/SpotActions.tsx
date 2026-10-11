@@ -36,6 +36,7 @@ export function SpotButton({ className, children }: { className?: string; childr
 
   const video = () => { keep([]); router.push("/ride"); };
   const manual = () => router.push("/submit");
+  const demo = () => { keep([]); router.push("/ride?demo=1"); };
   const route = () => {
     setBusy(true); setNote(null);
     if (!navigator.geolocation) { setBusy(false); setNote(t("map.noLocationSupport")); return; }
@@ -83,6 +84,7 @@ export function SpotButton({ className, children }: { className?: string; childr
               </div>
               <p role="status" aria-live="polite" className="mt-3 min-h-5 text-sm text-muted">{note}</p>
               <p className="text-xs text-muted">{t("spotpick.safety")}</p>
+              <button type="button" onClick={demo} className="tap mt-2 text-sm underline underline-offset-4">{t("spotpick.demo")}</button>
             </motion.section>
           </motion.div>
         )}
